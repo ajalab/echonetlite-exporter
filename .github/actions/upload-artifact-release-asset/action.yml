@@ -1,0 +1,48 @@
+name: Upload release asset as artifact
+
+description: |
+  Upload release asset as artifact.
+
+inputs:
+  path:
+    description: paths of files to include as release asset
+    required: true
+  name:
+    description: asset name
+    required: true
+  format:
+    description: asset compression format (zip, tar.gz)
+    required: true
+
+runs:
+  using: composite
+  steps:
+    - name: Define environment variables
+      run: |
+          echo "INPUT_PATH=$INPUT_PATH" >> "$GITHUB_ENV"
+          echo "INPUT_NAME=$INPUT_NAME" >> "$GITHUB_ENV"
+          echo "ASSET_FILE=$ASSET_FILE" >> "$GITHUB_ENV"
+      env:
+        INPUT_PATH: ${{ inputs.path }}
+        INPUT_NAME: ${{ inputs.name }}
+        ASSET_FILE: ${{ inputs.name }}.${{ inputs.format }}
+      shell: bash
+    - name: Package asset (tar.gz)
+      if: inputs.format == 'tar.gz'
+      run: |
+          mkdir $INPUT_NAME
+          mv $INPUT_PATH "$INPUT_NAME"
+          tar zcf "$ASSET_FILE" "$INPUT_NAME"
+      shell: bash
+    - name: Package asset (zip)
+      if: inputs.format == 'zip'
+      run: |
+          mkdir $INPUT_NAME
+          mv $INPUT_PATH "$INPUT_NAME"
+          zip -r "$ASSET_FILE" "$INPUT_NAME"
+      shell: bash
+    - name: Upload asset as artifact
+      uses: actions/upload-artifact@v4
+      with:
+        name: ${{ env.ASSET_FILE }}
+        path: ${{ env.ASSET_FILE }}
