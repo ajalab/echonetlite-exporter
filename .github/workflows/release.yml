@@ -53,7 +53,7 @@ jobs:
       contents: write
     steps:
       - name: Download assets
-        uses: actions/download-artifact@v6
+        uses: actions/download-artifact@v7
         with:
           path: assets
           merge-multiple: true
