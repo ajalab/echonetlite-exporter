@@ -3,11 +3,13 @@ package echonetlite
 import (
 	"context"
 	"fmt"
+	"log/slog"
 	"net"
 	"sync"
 	"sync/atomic"
 	"syscall"
 
+	"golang.org/x/net/ipv4"
 	"golang.org/x/sys/unix"
 )
 
@@ -17,12 +19,15 @@ type Response struct {
 }
 
 type Connection struct {
-	conn    net.PacketConn
-	pending sync.Map
-	lastTID uint32
+	conn          net.PacketConn
+	connMulticast *ipv4.PacketConn
+	pending       sync.Map
+	lastTID       uint32
 }
 
-func NewConnection() (*Connection, error) {
+var addrMulticast = &net.UDPAddr{IP: net.ParseIP("224.0.23.0"), Port: 3610}
+
+func NewConnection(multicastInterface string) (*Connection, error) {
 	lc := net.ListenConfig{
 		Control: func(network, address string, c syscall.RawConn) error {
 			var err error
@@ -41,7 +46,21 @@ func NewConnection() (*Connection, error) {
 		return nil, err
 	}
 
-	m := &Connection{conn: conn}
+	connMulticast := ipv4.NewPacketConn(conn.(*net.UDPConn))
+	if multicastInterface != "" {
+		iface, err := net.InterfaceByName("eth0")
+		if err != nil {
+			return nil, fmt.Errorf("failed to get interface: %v", err)
+		}
+		if err := connMulticast.SetMulticastInterface(iface); err != nil {
+			return nil, fmt.Errorf("failed to set multicast interface (iface: %v): %v", iface, err)
+		}
+	}
+	if err := connMulticast.SetMulticastTTL(1); err != nil {
+		return nil, fmt.Errorf("failed to set multicast TTL: %v", err)
+	}
+
+	m := &Connection{conn: conn, connMulticast: connMulticast}
 	go m.receiveLoop()
 	return m, nil
 }
@@ -58,6 +77,18 @@ func (c *Connection) receiveLoop() {
 		copy(packet, buf[:n])
 		frame, err := Deserialize(packet)
 		if err != nil {
+			slog.Warn("ignoring broken frame", "err", err, "addr", addr.String())
+			continue
+		}
+
+		if frame.ESV >= 0x60 && frame.ESV <= 0x6E {
+			slog.Info(
+				"ignoring request frame",
+				"esv", frame.ESV,
+				"seoj", frame.SEOJ.String(),
+				"deoj", frame.DEOJ.String(),
+				"addr", addr.String(),
+			)
 			continue
 		}
 
@@ -91,16 +122,14 @@ func (c *Connection) unicast(ctx context.Context, host string, req Frame) (*Fram
 	}
 }
 
-func (c *Connection) broadcast(ctx context.Context, req Frame) ([]Response, error) {
-	dest := "224.0.23.0:3610"
+func (c *Connection) multicast(ctx context.Context, req Frame) ([]Response, error) {
 	req.TID = uint16(atomic.AddUint32(&c.lastTID, 1) & 0xFFFF)
 
 	resCh := make(chan Response, 100)
 	c.pending.Store(req.TID, resCh)
 	defer c.pending.Delete(req.TID)
 
-	addr, _ := net.ResolveUDPAddr("udp4", dest)
-	if _, err := c.conn.WriteTo(req.Serialize(), addr); err != nil {
+	if _, err := c.connMulticast.WriteTo(req.Serialize(), nil, addrMulticast); err != nil {
 		return nil, fmt.Errorf("write error: %w", err)
 	}
 

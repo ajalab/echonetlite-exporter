@@ -3,7 +3,7 @@ package collector
 import (
 	"context"
 	"fmt"
-	"log"
+	"log/slog"
 	"time"
 
 	"echonetlite-exporter/echonetlite"
@@ -11,89 +11,92 @@ import (
 	"github.com/prometheus/client_golang/prometheus"
 )
 
-const pollInterval = 15 * time.Second
-
 type PowerDistributionBoardMeterCollector struct {
 	objectUpdates <-chan []*echonetlite.PowerDistributionBoardMetering
+	interval      time.Duration
+	timeout       time.Duration
 
 	instantaneousElectricPowerSimplexGauge *prometheus.GaugeVec
 	cumulativeElectricEnergySimplexGauge   *prometheus.GaugeVec
-	pollMetrics                            *PollMetrics
+	collectMetrics                         *collectMetrics
 }
 
-func NewPowerDistributionBoardMeterCollector(conn *echonetlite.Connection, updates <-chan []*echonetlite.PowerDistributionBoardMetering) *PowerDistributionBoardMeterCollector {
+func NewPowerDistributionBoardMeterCollector(
+	conn *echonetlite.Connection,
+	updates <-chan []*echonetlite.PowerDistributionBoardMetering,
+	interval time.Duration,
+	timeout time.Duration,
+) *PowerDistributionBoardMeterCollector {
 	return &PowerDistributionBoardMeterCollector{
 		objectUpdates: updates,
+		interval:      interval,
+		timeout:       timeout,
 		instantaneousElectricPowerSimplexGauge: prometheus.NewGaugeVec(
 			prometheus.GaugeOpts{
-				Name: "echonetlite_pdbm_instantaneous_electric_power_simplex_watts",
+				Name: "echonetlite_pdbm_electric_power_simplex_watts",
 				Help: "Instantaneous electric power per channel (simplex).",
 			},
 			[]string{"host", "eoj", "channel"},
 		),
 		cumulativeElectricEnergySimplexGauge: prometheus.NewGaugeVec(
 			prometheus.GaugeOpts{
-				Name: "echonetlite_pdbm_cumulative_electric_energy_simplex_watts",
+				Name: "echonetlite_pdbm_electric_energy_simplex_joules_total",
 				Help: "Cumulative amount of electric power consumption (simplex)",
 			},
 			[]string{"host", "eoj", "channel"},
 		),
-		pollMetrics: NewPollMetrics(),
+		collectMetrics: NewPollMetrics(),
 	}
 }
 
 func (c *PowerDistributionBoardMeterCollector) Start(ctx context.Context) {
-	if c.objectUpdates == nil {
-		log.Printf("pdbm collector has no object updates channel; polling disabled")
-		return
-	}
-	go c.pollLoop(ctx)
+	go c.collectLoop(ctx)
 }
 
 func (c *PowerDistributionBoardMeterCollector) Describe(ch chan<- *prometheus.Desc) {
 	c.cumulativeElectricEnergySimplexGauge.Describe(ch)
 	c.instantaneousElectricPowerSimplexGauge.Describe(ch)
-	c.pollMetrics.Describe(ch)
+	c.collectMetrics.Describe(ch)
 }
 
 func (c *PowerDistributionBoardMeterCollector) Collect(ch chan<- prometheus.Metric) {
 	c.cumulativeElectricEnergySimplexGauge.Collect(ch)
 	c.instantaneousElectricPowerSimplexGauge.Collect(ch)
-	c.pollMetrics.Collect(ch)
+	c.collectMetrics.Collect(ch)
 }
 
-func (c *PowerDistributionBoardMeterCollector) pollLoop(ctx context.Context) {
-	ticker := time.NewTicker(pollInterval)
+func (c *PowerDistributionBoardMeterCollector) collectLoop(ctx context.Context) {
+	ticker := time.NewTicker(c.interval)
 	defer ticker.Stop()
 
 	var pdbms []*echonetlite.PowerDistributionBoardMetering
 	for {
 		select {
 		case <-ticker.C:
-			c.runPoll(ctx, pdbms)
+			c.collect(ctx, pdbms)
 		case updated := <-c.objectUpdates:
 			pdbms = updated
-			c.runPoll(ctx, pdbms)
+			c.collect(ctx, pdbms)
 		case <-ctx.Done():
 			return
 		}
 	}
 }
 
-func (c *PowerDistributionBoardMeterCollector) runPoll(ctx context.Context, pdbms []*echonetlite.PowerDistributionBoardMetering) {
+func (c *PowerDistributionBoardMeterCollector) collect(ctx context.Context, pdbms []*echonetlite.PowerDistributionBoardMetering) {
 	for _, pdbm := range pdbms {
-		reqCtx, cancel := context.WithTimeout(ctx, requestTimeout)
+		reqCtx, cancel := context.WithTimeout(ctx, c.timeout)
 		props, err := pdbm.Get(reqCtx)
 		cancel()
 
 		if err != nil {
-			c.pollMetrics.IncPollError(pdbm.Host(), pdbm.EOJ().String())
-			log.Printf("poll error for %s: %v", pdbm.Host(), err)
+			c.collectMetrics.SetSuccess(pdbm.Host(), pdbm.EOJ().String(), false)
+			slog.Warn("failed to collect stats", "host", pdbm.Host(), "eoj", pdbm.EOJ().String(), "err", err)
 			continue
 		}
+		c.collectMetrics.SetSuccess(pdbm.Host(), pdbm.EOJ().String(), true)
 
 		c.updateMetrics(pdbm, props)
-		c.pollMetrics.SetLastPollTimestamp(pdbm.Host(), pdbm.EOJ().String(), time.Now())
 	}
 }
 
@@ -112,7 +115,7 @@ func (c *PowerDistributionBoardMeterCollector) updateMetrics(
 		start := int(props.CumulativeElectricEnergyListSimplex.StartChannel)
 		for i, val := range props.CumulativeElectricEnergyListSimplex.ElectricEnergy {
 			channel := fmt.Sprintf("%d", start+i)
-			cumulativeValue := float64(val) * float64(props.UnitForCumulativeEnergy) * 1000
+			cumulativeValue := float64(val) * float64(props.UnitForCumulativeEnergy) * 1000 * 3600 // kWh to J
 			c.cumulativeElectricEnergySimplexGauge.WithLabelValues(pdbm.Host(), pdbm.EOJ().String(), channel).Set(cumulativeValue)
 		}
 	}

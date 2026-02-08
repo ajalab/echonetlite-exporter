@@ -2,7 +2,10 @@ package main
 
 import (
 	"context"
+	"flag"
+	"fmt"
 	"log"
+	"log/slog"
 	"net/http"
 	"os"
 	"os/signal"
@@ -16,10 +19,16 @@ import (
 	"github.com/prometheus/client_golang/prometheus/promhttp"
 )
 
+var (
+	netMulticastInterface = flag.String("net.multicastInterface", "", "Network interface for UDP multicast")
+	scannerInterval       = flag.Duration("scanner.interval", 60*time.Second, "Interval for scanning ECHONET Lite nodes")
+	scannerTimeout        = flag.Duration("scanner.timeout", 10*time.Second, "Timeout for scanning ECHONET Lite nodes")
+	collectorInterval     = flag.Duration("collector.interval", 15*time.Second, "Interval for collecting metrics from nodes")
+	collectorTimeout      = flag.Duration("collector.timeout", 10*time.Second, "Timeout for collecting metrics from nodes")
+)
+
 const (
-	scanInterval   = 60 * time.Second
-	requestTimeout = 10 * time.Second
-	listenAddr     = ":9100"
+	listenAddr = ":9200"
 )
 
 type Exporter struct {
@@ -34,7 +43,12 @@ type Exporter struct {
 
 func NewExporter(conn *echonetlite.Connection) *Exporter {
 	pdbmUpdates := make(chan []*echonetlite.PowerDistributionBoardMetering)
-	pdbmCollector := collector.NewPowerDistributionBoardMeterCollector(conn, pdbmUpdates)
+	pdbmCollector := collector.NewPowerDistributionBoardMeterCollector(
+		conn,
+		pdbmUpdates,
+		*collectorInterval,
+		*collectorTimeout,
+	)
 	exporter := &Exporter{
 		conn:    conn,
 		scanner: echonetlite.NewScanner(conn),
@@ -62,7 +76,7 @@ func (e *Exporter) Start(ctx context.Context) {
 }
 
 func (e *Exporter) scanLoop(ctx context.Context) {
-	ticker := time.NewTicker(scanInterval)
+	ticker := time.NewTicker(*scannerInterval)
 	defer ticker.Stop()
 
 	e.runScan(ctx)
@@ -77,13 +91,13 @@ func (e *Exporter) scanLoop(ctx context.Context) {
 }
 
 func (e *Exporter) runScan(ctx context.Context) {
-	reqCtx, cancel := context.WithTimeout(ctx, requestTimeout)
+	reqCtx, cancel := context.WithTimeout(ctx, *scannerTimeout)
 	defer cancel()
 
 	nodes, err := e.scanner.ScanNodes(reqCtx)
 	if err != nil {
 		e.scanErrorsTotal.Inc()
-		log.Printf("scan error: %v", err)
+		slog.Error("failed to scan nodes", "err", err)
 		return
 	}
 
@@ -105,7 +119,9 @@ func (e *Exporter) runScan(ctx context.Context) {
 }
 
 func main() {
-	conn, err := echonetlite.NewConnection()
+	flag.Parse()
+
+	conn, err := echonetlite.NewConnection(*netMulticastInterface)
 	if err != nil {
 		log.Fatalf("connection error: %v", err)
 	}
@@ -123,7 +139,7 @@ func main() {
 	server := &http.Server{Addr: listenAddr}
 
 	go func() {
-		log.Printf("listening on %s", listenAddr)
+		slog.Info(fmt.Sprintf("listening on %s", listenAddr))
 		if err := server.ListenAndServe(); err != nil && err != http.ErrServerClosed {
 			log.Fatalf("http server error: %v", err)
 		}
@@ -137,6 +153,6 @@ func main() {
 	defer shutdownCancel()
 
 	if err := server.Shutdown(shutdownCtx); err != nil {
-		log.Printf("http shutdown error: %v", err)
+		slog.Error("http shutdown error", "err", err)
 	}
 }

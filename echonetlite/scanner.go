@@ -2,6 +2,7 @@ package echonetlite
 
 import (
 	"context"
+	"log/slog"
 	"net"
 )
 
@@ -28,16 +29,28 @@ func (s Scanner) ScanNodes(ctx context.Context) ([]Node, error) {
 			{EPC: 0xD6, EDT: []byte{}},
 		},
 	}
-	responses, err := s.conn.broadcast(ctx, req)
+	responses, err := s.conn.multicast(ctx, req)
 	if err != nil {
 		return nil, err
 	}
 
 	var nodes []Node
+loopResponses:
 	for _, res := range responses {
+		logger := slog.With()
+
 		var operatingStatus bool
 		var instanceList []EOJ
 		for _, p := range res.Frame.Properties {
+			if len(p.EDT) == 0 {
+				logger.Warn(
+					"missing EDT",
+					"seoj", res.Frame.SEOJ,
+					"deoj", res.Frame.DEOJ,
+					"addr", res.Addr.String(),
+				)
+				continue loopResponses
+			}
 			switch p.EPC {
 			case 0x80:
 				switch p.EDT[0] {
