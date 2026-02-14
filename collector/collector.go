@@ -5,17 +5,19 @@ import (
 )
 
 type collectMetrics struct {
+	collector    string
 	successGauge *prometheus.GaugeVec
 }
 
-func NewPollMetrics() *collectMetrics {
+func newCollectMetrics(collector string) *collectMetrics {
 	return &collectMetrics{
+		collector: collector,
 		successGauge: prometheus.NewGaugeVec(
 			prometheus.GaugeOpts{
-				Name: "echonetlite_collect_success",
+				Name: "echonetlite_collector_success",
 				Help: "Whether the last collection was successful (1 for success, 0 for failure).",
 			},
-			[]string{"host", "eoj"},
+			[]string{"collector", "host", "eoj"},
 		),
 	}
 }
@@ -30,8 +32,8 @@ func (m *collectMetrics) Collect(ch chan<- prometheus.Metric) {
 
 func (m *collectMetrics) SetSuccess(host, eoj string, success bool) {
 	if success {
-		m.successGauge.WithLabelValues(host, eoj).Set(1)
+		m.successGauge.WithLabelValues(m.collector, host, eoj).Set(1)
 	} else {
-		m.successGauge.WithLabelValues(host, eoj).Set(0)
+		m.successGauge.WithLabelValues(m.collector, host, eoj).Set(0)
 	}
 }

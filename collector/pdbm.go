@@ -45,7 +45,7 @@ func NewPowerDistributionBoardMeterCollector(
 			},
 			[]string{"host", "eoj", "channel"},
 		),
-		collectMetrics: NewPollMetrics(),
+		collectMetrics: newCollectMetrics("pdbm"),
 	}
 }
 
