@@ -3,6 +3,7 @@ package collector
 import (
 	"context"
 	"log/slog"
+	"sync"
 	"time"
 
 	"echonetlite-exporter/echonetlite"
@@ -16,8 +17,15 @@ type PVPowerGenerationCollector struct {
 	timeout       time.Duration
 
 	instantaneousPowerGauge *prometheus.GaugeVec
-	cumulativeEnergyGauge   *prometheus.GaugeVec
+	cumulativeEnergyDesc    *prometheus.Desc
+	cumulativeEnergy        map[cumulativeEnergyKey]float64
+	cumulativeEnergyMu      sync.Mutex
 	collectMetrics          *CollectMetrics
+}
+
+type cumulativeEnergyKey struct {
+	host string
+	eoj  string
 }
 
 func NewPVPowerGenerationCollector(
@@ -38,14 +46,14 @@ func NewPVPowerGenerationCollector(
 			},
 			[]string{"host", "eoj"},
 		),
-		cumulativeEnergyGauge: prometheus.NewGaugeVec(
-			prometheus.GaugeOpts{
-				Name: "echonetlite_pv_power_generation_electric_energy_generation_joules_total",
-				Help: "Cumulative generated energy.",
-			},
+		cumulativeEnergyDesc: prometheus.NewDesc(
+			"echonetlite_pv_power_generation_electric_energy_generation_joules_total",
+			"Cumulative generated energy.",
 			[]string{"host", "eoj"},
+			nil,
 		),
-		collectMetrics: collectMetrics,
+		cumulativeEnergy: make(map[cumulativeEnergyKey]float64),
+		collectMetrics:   collectMetrics,
 	}
 }
 
@@ -55,12 +63,22 @@ func (c *PVPowerGenerationCollector) Start(ctx context.Context) {
 
 func (c *PVPowerGenerationCollector) Describe(ch chan<- *prometheus.Desc) {
 	c.instantaneousPowerGauge.Describe(ch)
-	c.cumulativeEnergyGauge.Describe(ch)
+	ch <- c.cumulativeEnergyDesc
 }
 
 func (c *PVPowerGenerationCollector) Collect(ch chan<- prometheus.Metric) {
 	c.instantaneousPowerGauge.Collect(ch)
-	c.cumulativeEnergyGauge.Collect(ch)
+	c.cumulativeEnergyMu.Lock()
+	for key, value := range c.cumulativeEnergy {
+		ch <- prometheus.MustNewConstMetric(
+			c.cumulativeEnergyDesc,
+			prometheus.CounterValue,
+			value,
+			key.host,
+			key.eoj,
+		)
+	}
+	c.cumulativeEnergyMu.Unlock()
 }
 
 func (c *PVPowerGenerationCollector) collectLoop(ctx context.Context) {
@@ -103,7 +121,14 @@ func (c *PVPowerGenerationCollector) updateMetrics(
 	props *echonetlite.PVPowerGenerationProps,
 ) {
 	c.instantaneousPowerGauge.WithLabelValues(pv.Host(), pv.EOJ().String()).Set(float64(props.InstantaneousElectricPowerGeneration))
+
 	kWh := float64(props.CumulativeElectricEnergyOfGeneration) * 0.001
 	joules := kWh * 3600000
-	c.cumulativeEnergyGauge.WithLabelValues(pv.Host(), pv.EOJ().String()).Set(joules)
+	key := cumulativeEnergyKey{
+		host: pv.Host(),
+		eoj:  pv.EOJ().String(),
+	}
+	c.cumulativeEnergyMu.Lock()
+	c.cumulativeEnergy[key] = joules
+	c.cumulativeEnergyMu.Unlock()
 }

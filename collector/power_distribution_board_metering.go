@@ -4,6 +4,7 @@ import (
 	"context"
 	"fmt"
 	"log/slog"
+	"sync"
 	"time"
 
 	"echonetlite-exporter/echonetlite"
@@ -17,8 +18,16 @@ type PowerDistributionBoardMeteringCollector struct {
 	timeout       time.Duration
 
 	instantaneousElectricPowerSimplexGauge *prometheus.GaugeVec
-	cumulativeElectricEnergySimplexGauge   *prometheus.GaugeVec
+	cumulativeElectricEnergySimplexDesc    *prometheus.Desc
+	cumulativeElectricEnergySimplex        map[cumulativeElectricEnergyKey]float64
+	cumulativeElectricEnergySimplexMu      sync.Mutex
 	collectMetrics                         *CollectMetrics
+}
+
+type cumulativeElectricEnergyKey struct {
+	host    string
+	eoj     string
+	channel string
 }
 
 func NewPowerDistributionBoardMeteringCollector(
@@ -39,13 +48,13 @@ func NewPowerDistributionBoardMeteringCollector(
 			},
 			[]string{"host", "eoj", "channel"},
 		),
-		cumulativeElectricEnergySimplexGauge: prometheus.NewGaugeVec(
-			prometheus.GaugeOpts{
-				Name: "echonetlite_power_distribution_board_metering_electric_energy_simplex_joules_total",
-				Help: "Cumulative amount of electric power consumption (simplex)",
-			},
+		cumulativeElectricEnergySimplexDesc: prometheus.NewDesc(
+			"echonetlite_power_distribution_board_metering_electric_energy_simplex_joules_total",
+			"Cumulative amount of electric power consumption (simplex)",
 			[]string{"host", "eoj", "channel"},
+			nil,
 		),
+		cumulativeElectricEnergySimplex: make(map[cumulativeElectricEnergyKey]float64),
 		collectMetrics: collectMetrics,
 	}
 }
@@ -55,13 +64,24 @@ func (c *PowerDistributionBoardMeteringCollector) Start(ctx context.Context) {
 }
 
 func (c *PowerDistributionBoardMeteringCollector) Describe(ch chan<- *prometheus.Desc) {
-	c.cumulativeElectricEnergySimplexGauge.Describe(ch)
 	c.instantaneousElectricPowerSimplexGauge.Describe(ch)
+	ch <- c.cumulativeElectricEnergySimplexDesc
 }
 
 func (c *PowerDistributionBoardMeteringCollector) Collect(ch chan<- prometheus.Metric) {
-	c.cumulativeElectricEnergySimplexGauge.Collect(ch)
 	c.instantaneousElectricPowerSimplexGauge.Collect(ch)
+	c.cumulativeElectricEnergySimplexMu.Lock()
+	for key, value := range c.cumulativeElectricEnergySimplex {
+		ch <- prometheus.MustNewConstMetric(
+			c.cumulativeElectricEnergySimplexDesc,
+			prometheus.CounterValue,
+			value,
+			key.host,
+			key.eoj,
+			key.channel,
+		)
+	}
+	c.cumulativeElectricEnergySimplexMu.Unlock()
 }
 
 func (c *PowerDistributionBoardMeteringCollector) collectLoop(ctx context.Context) {
@@ -112,10 +132,17 @@ func (c *PowerDistributionBoardMeteringCollector) updateMetrics(
 	}
 	{
 		start := int(props.CumulativeElectricEnergyListSimplex.StartChannel)
+		c.cumulativeElectricEnergySimplexMu.Lock()
 		for i, val := range props.CumulativeElectricEnergyListSimplex.ElectricEnergy {
 			channel := fmt.Sprintf("%d", start+i)
 			cumulativeValue := float64(val) * float64(props.UnitForCumulativeEnergy) * 1000 * 3600 // kWh to J
-			c.cumulativeElectricEnergySimplexGauge.WithLabelValues(pdbm.Host(), pdbm.EOJ().String(), channel).Set(cumulativeValue)
+			key := cumulativeElectricEnergyKey{
+				host:    pdbm.Host(),
+				eoj:     pdbm.EOJ().String(),
+				channel: channel,
+			}
+			c.cumulativeElectricEnergySimplex[key] = cumulativeValue
 		}
+		c.cumulativeElectricEnergySimplexMu.Unlock()
 	}
 }
