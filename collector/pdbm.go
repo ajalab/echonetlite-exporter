@@ -89,11 +89,11 @@ func (c *PowerDistributionBoardMeteringCollector) collect(ctx context.Context, p
 		cancel()
 
 		if err != nil {
-			c.collectMetrics.SetSuccess("pdbm", pdbm.Host(), pdbm.EOJ().String(), false)
+			c.collectMetrics.SetSuccess(pdbm.Host(), pdbm.EOJ().String(), false)
 			slog.Warn("failed to collect stats", "host", pdbm.Host(), "eoj", pdbm.EOJ().String(), "err", err)
 			continue
 		}
-		c.collectMetrics.SetSuccess("pdbm", pdbm.Host(), pdbm.EOJ().String(), true)
+		c.collectMetrics.SetSuccess(pdbm.Host(), pdbm.EOJ().String(), true)
 
 		c.updateMetrics(pdbm, props)
 	}

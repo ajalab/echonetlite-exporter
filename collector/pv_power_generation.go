@@ -88,11 +88,11 @@ func (c *PVPowerGenerationCollector) collect(ctx context.Context, pvs []*echonet
 		cancel()
 
 		if err != nil {
-			c.collectMetrics.SetSuccess("pv_power_generation", pv.Host(), pv.EOJ().String(), false)
+			c.collectMetrics.SetSuccess(pv.Host(), pv.EOJ().String(), false)
 			slog.Warn("failed to collect stats", "host", pv.Host(), "eoj", pv.EOJ().String(), "err", err)
 			continue
 		}
-		c.collectMetrics.SetSuccess("pv_power_generation", pv.Host(), pv.EOJ().String(), true)
+		c.collectMetrics.SetSuccess(pv.Host(), pv.EOJ().String(), true)
 
 		c.updateMetrics(pv, props)
 	}
