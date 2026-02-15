@@ -11,7 +11,7 @@ import (
 	"github.com/prometheus/client_golang/prometheus"
 )
 
-type PowerDistributionBoardMeterCollector struct {
+type PowerDistributionBoardMeteringCollector struct {
 	objectUpdates <-chan []*echonetlite.PowerDistributionBoardMetering
 	interval      time.Duration
 	timeout       time.Duration
@@ -21,27 +21,27 @@ type PowerDistributionBoardMeterCollector struct {
 	collectMetrics                         *CollectMetrics
 }
 
-func NewPowerDistributionBoardMeterCollector(
+func NewPowerDistributionBoardMeteringCollector(
 	conn *echonetlite.Connection,
 	updates <-chan []*echonetlite.PowerDistributionBoardMetering,
 	interval time.Duration,
 	timeout time.Duration,
 	collectMetrics *CollectMetrics,
-) *PowerDistributionBoardMeterCollector {
-	return &PowerDistributionBoardMeterCollector{
+) *PowerDistributionBoardMeteringCollector {
+	return &PowerDistributionBoardMeteringCollector{
 		objectUpdates: updates,
 		interval:      interval,
 		timeout:       timeout,
 		instantaneousElectricPowerSimplexGauge: prometheus.NewGaugeVec(
 			prometheus.GaugeOpts{
-				Name: "echonetlite_pdbm_electric_power_simplex_watts",
+				Name: "echonetlite_power_distribution_board_metering_electric_power_simplex_watts",
 				Help: "Instantaneous electric power per channel (simplex).",
 			},
 			[]string{"host", "eoj", "channel"},
 		),
 		cumulativeElectricEnergySimplexGauge: prometheus.NewGaugeVec(
 			prometheus.GaugeOpts{
-				Name: "echonetlite_pdbm_electric_energy_simplex_joules_total",
+				Name: "echonetlite_power_distribution_board_metering_electric_energy_simplex_joules_total",
 				Help: "Cumulative amount of electric power consumption (simplex)",
 			},
 			[]string{"host", "eoj", "channel"},
@@ -50,21 +50,21 @@ func NewPowerDistributionBoardMeterCollector(
 	}
 }
 
-func (c *PowerDistributionBoardMeterCollector) Start(ctx context.Context) {
+func (c *PowerDistributionBoardMeteringCollector) Start(ctx context.Context) {
 	go c.collectLoop(ctx)
 }
 
-func (c *PowerDistributionBoardMeterCollector) Describe(ch chan<- *prometheus.Desc) {
+func (c *PowerDistributionBoardMeteringCollector) Describe(ch chan<- *prometheus.Desc) {
 	c.cumulativeElectricEnergySimplexGauge.Describe(ch)
 	c.instantaneousElectricPowerSimplexGauge.Describe(ch)
 }
 
-func (c *PowerDistributionBoardMeterCollector) Collect(ch chan<- prometheus.Metric) {
+func (c *PowerDistributionBoardMeteringCollector) Collect(ch chan<- prometheus.Metric) {
 	c.cumulativeElectricEnergySimplexGauge.Collect(ch)
 	c.instantaneousElectricPowerSimplexGauge.Collect(ch)
 }
 
-func (c *PowerDistributionBoardMeterCollector) collectLoop(ctx context.Context) {
+func (c *PowerDistributionBoardMeteringCollector) collectLoop(ctx context.Context) {
 	ticker := time.NewTicker(c.interval)
 	defer ticker.Stop()
 
@@ -82,7 +82,7 @@ func (c *PowerDistributionBoardMeterCollector) collectLoop(ctx context.Context) 
 	}
 }
 
-func (c *PowerDistributionBoardMeterCollector) collect(ctx context.Context, pdbms []*echonetlite.PowerDistributionBoardMetering) {
+func (c *PowerDistributionBoardMeteringCollector) collect(ctx context.Context, pdbms []*echonetlite.PowerDistributionBoardMetering) {
 	for _, pdbm := range pdbms {
 		reqCtx, cancel := context.WithTimeout(ctx, c.timeout)
 		props, err := pdbm.Get(reqCtx)
@@ -99,7 +99,7 @@ func (c *PowerDistributionBoardMeterCollector) collect(ctx context.Context, pdbm
 	}
 }
 
-func (c *PowerDistributionBoardMeterCollector) updateMetrics(
+func (c *PowerDistributionBoardMeteringCollector) updateMetrics(
 	pdbm *echonetlite.PowerDistributionBoardMetering,
 	props *echonetlite.PowerDistributionBoardMeteringProps,
 ) {

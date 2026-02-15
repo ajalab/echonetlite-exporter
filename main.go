@@ -37,7 +37,7 @@ type Exporter struct {
 
 	scanErrorsTotal prometheus.Counter
 
-	pdbmCollector *collector.PowerDistributionBoardMeterCollector
+	pdbmCollector *collector.PowerDistributionBoardMeteringCollector
 	pdbmUpdates   chan []*echonetlite.PowerDistributionBoardMetering
 	pvCollector   *collector.PVPowerGenerationCollector
 	pvUpdates     chan []*echonetlite.PVPowerGeneration
@@ -48,7 +48,7 @@ type Exporter struct {
 func NewExporter(conn *echonetlite.Connection) *Exporter {
 	pdbmUpdates := make(chan []*echonetlite.PowerDistributionBoardMetering)
 	collectMetrics := collector.NewCollectMetrics()
-	pdbmCollector := collector.NewPowerDistributionBoardMeterCollector(
+	pdbmCollector := collector.NewPowerDistributionBoardMeteringCollector(
 		conn,
 		pdbmUpdates,
 		*collectorInterval,
@@ -70,10 +70,10 @@ func NewExporter(conn *echonetlite.Connection) *Exporter {
 			Name: "echonetlite_exporter_scan_errors_total",
 			Help: "Total number of scan errors.",
 		}),
-		pdbmCollector: pdbmCollector,
-		pdbmUpdates:   pdbmUpdates,
-		pvCollector:   pvCollector,
-		pvUpdates:     pvUpdates,
+		pdbmCollector:  pdbmCollector,
+		pdbmUpdates:    pdbmUpdates,
+		pvCollector:    pvCollector,
+		pvUpdates:      pvUpdates,
 		collectMetrics: collectMetrics,
 	}
 
