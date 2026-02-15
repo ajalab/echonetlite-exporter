@@ -4,14 +4,12 @@ import (
 	"github.com/prometheus/client_golang/prometheus"
 )
 
-type collectMetrics struct {
-	collector    string
+type CollectMetrics struct {
 	successGauge *prometheus.GaugeVec
 }
 
-func newCollectMetrics(collector string) *collectMetrics {
-	return &collectMetrics{
-		collector: collector,
+func NewCollectMetrics() *CollectMetrics {
+	return &CollectMetrics{
 		successGauge: prometheus.NewGaugeVec(
 			prometheus.GaugeOpts{
 				Name: "echonetlite_collector_success",
@@ -22,18 +20,14 @@ func newCollectMetrics(collector string) *collectMetrics {
 	}
 }
 
-func (m *collectMetrics) Describe(ch chan<- *prometheus.Desc) {
-	m.successGauge.Describe(ch)
+func (m *CollectMetrics) Collector() prometheus.Collector {
+	return m.successGauge
 }
 
-func (m *collectMetrics) Collect(ch chan<- prometheus.Metric) {
-	m.successGauge.Collect(ch)
-}
-
-func (m *collectMetrics) SetSuccess(host, eoj string, success bool) {
+func (m *CollectMetrics) SetSuccess(collector, host, eoj string, success bool) {
 	if success {
-		m.successGauge.WithLabelValues(m.collector, host, eoj).Set(1)
+		m.successGauge.WithLabelValues(collector, host, eoj).Set(1)
 	} else {
-		m.successGauge.WithLabelValues(m.collector, host, eoj).Set(0)
+		m.successGauge.WithLabelValues(collector, host, eoj).Set(0)
 	}
 }

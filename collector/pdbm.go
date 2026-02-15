@@ -18,7 +18,7 @@ type PowerDistributionBoardMeterCollector struct {
 
 	instantaneousElectricPowerSimplexGauge *prometheus.GaugeVec
 	cumulativeElectricEnergySimplexGauge   *prometheus.GaugeVec
-	collectMetrics                         *collectMetrics
+	collectMetrics                         *CollectMetrics
 }
 
 func NewPowerDistributionBoardMeterCollector(
@@ -26,6 +26,7 @@ func NewPowerDistributionBoardMeterCollector(
 	updates <-chan []*echonetlite.PowerDistributionBoardMetering,
 	interval time.Duration,
 	timeout time.Duration,
+	collectMetrics *CollectMetrics,
 ) *PowerDistributionBoardMeterCollector {
 	return &PowerDistributionBoardMeterCollector{
 		objectUpdates: updates,
@@ -45,7 +46,7 @@ func NewPowerDistributionBoardMeterCollector(
 			},
 			[]string{"host", "eoj", "channel"},
 		),
-		collectMetrics: newCollectMetrics("pdbm"),
+		collectMetrics: collectMetrics,
 	}
 }
 
@@ -56,13 +57,11 @@ func (c *PowerDistributionBoardMeterCollector) Start(ctx context.Context) {
 func (c *PowerDistributionBoardMeterCollector) Describe(ch chan<- *prometheus.Desc) {
 	c.cumulativeElectricEnergySimplexGauge.Describe(ch)
 	c.instantaneousElectricPowerSimplexGauge.Describe(ch)
-	c.collectMetrics.Describe(ch)
 }
 
 func (c *PowerDistributionBoardMeterCollector) Collect(ch chan<- prometheus.Metric) {
 	c.cumulativeElectricEnergySimplexGauge.Collect(ch)
 	c.instantaneousElectricPowerSimplexGauge.Collect(ch)
-	c.collectMetrics.Collect(ch)
 }
 
 func (c *PowerDistributionBoardMeterCollector) collectLoop(ctx context.Context) {
@@ -90,11 +89,11 @@ func (c *PowerDistributionBoardMeterCollector) collect(ctx context.Context, pdbm
 		cancel()
 
 		if err != nil {
-			c.collectMetrics.SetSuccess(pdbm.Host(), pdbm.EOJ().String(), false)
+			c.collectMetrics.SetSuccess("pdbm", pdbm.Host(), pdbm.EOJ().String(), false)
 			slog.Warn("failed to collect stats", "host", pdbm.Host(), "eoj", pdbm.EOJ().String(), "err", err)
 			continue
 		}
-		c.collectMetrics.SetSuccess(pdbm.Host(), pdbm.EOJ().String(), true)
+		c.collectMetrics.SetSuccess("pdbm", pdbm.Host(), pdbm.EOJ().String(), true)
 
 		c.updateMetrics(pdbm, props)
 	}

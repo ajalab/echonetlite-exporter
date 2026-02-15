@@ -39,15 +39,29 @@ type Exporter struct {
 
 	pdbmCollector *collector.PowerDistributionBoardMeterCollector
 	pdbmUpdates   chan []*echonetlite.PowerDistributionBoardMetering
+	pvCollector   *collector.PVPowerGenerationCollector
+	pvUpdates     chan []*echonetlite.PVPowerGeneration
+
+	collectMetrics *collector.CollectMetrics
 }
 
 func NewExporter(conn *echonetlite.Connection) *Exporter {
 	pdbmUpdates := make(chan []*echonetlite.PowerDistributionBoardMetering)
+	collectMetrics := collector.NewCollectMetrics()
 	pdbmCollector := collector.NewPowerDistributionBoardMeterCollector(
 		conn,
 		pdbmUpdates,
 		*collectorInterval,
 		*collectorTimeout,
+		collectMetrics,
+	)
+	pvUpdates := make(chan []*echonetlite.PVPowerGeneration)
+	pvCollector := collector.NewPVPowerGenerationCollector(
+		conn,
+		pvUpdates,
+		*collectorInterval,
+		*collectorTimeout,
+		collectMetrics,
 	)
 	exporter := &Exporter{
 		conn:    conn,
@@ -58,6 +72,9 @@ func NewExporter(conn *echonetlite.Connection) *Exporter {
 		}),
 		pdbmCollector: pdbmCollector,
 		pdbmUpdates:   pdbmUpdates,
+		pvCollector:   pvCollector,
+		pvUpdates:     pvUpdates,
+		collectMetrics: collectMetrics,
 	}
 
 	return exporter
@@ -66,13 +83,16 @@ func NewExporter(conn *echonetlite.Connection) *Exporter {
 func (e *Exporter) RegisterMetrics() {
 	prometheus.MustRegister(
 		e.scanErrorsTotal,
+		e.collectMetrics.Collector(),
 		e.pdbmCollector,
+		e.pvCollector,
 	)
 }
 
 func (e *Exporter) Start(ctx context.Context) {
 	go e.scanLoop(ctx)
 	e.pdbmCollector.Start(ctx)
+	e.pvCollector.Start(ctx)
 }
 
 func (e *Exporter) scanLoop(ctx context.Context) {
@@ -102,6 +122,7 @@ func (e *Exporter) runScan(ctx context.Context) {
 	}
 
 	var pdbms []*echonetlite.PowerDistributionBoardMetering
+	var pvs []*echonetlite.PVPowerGeneration
 	for _, node := range nodes {
 		nodeProfile := node.NodeProfile
 		for _, eoj := range nodeProfile.SelfNodeInstanceListS {
@@ -113,9 +134,18 @@ func (e *Exporter) runScan(ctx context.Context) {
 				),
 				)
 			}
+			if eoj[0] == 0x02 && eoj[1] == 0x79 {
+				pvs = append(pvs, echonetlite.NewPVPowerGeneration(
+					node.Host,
+					eoj,
+					e.conn,
+				),
+				)
+			}
 		}
 	}
 	e.pdbmUpdates <- pdbms
+	e.pvUpdates <- pvs
 }
 
 func main() {
