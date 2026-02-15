@@ -20,15 +20,12 @@ import (
 )
 
 var (
+	webListenAddr         = flag.String("net.listenAddr", ":9200", "Address to listen on for HTTP requests")
 	netMulticastInterface = flag.String("net.multicastInterface", "", "Network interface for UDP multicast")
 	scannerInterval       = flag.Duration("scanner.interval", 60*time.Second, "Interval for scanning ECHONET Lite nodes")
 	scannerTimeout        = flag.Duration("scanner.timeout", 10*time.Second, "Timeout for scanning ECHONET Lite nodes")
 	collectorInterval     = flag.Duration("collector.interval", 15*time.Second, "Interval for collecting metrics from nodes")
 	collectorTimeout      = flag.Duration("collector.timeout", 10*time.Second, "Timeout for collecting metrics from nodes")
-)
-
-const (
-	listenAddr = ":9200"
 )
 
 type Exporter struct {
@@ -166,10 +163,10 @@ func main() {
 	exporter.Start(ctx)
 
 	http.Handle("/metrics", promhttp.Handler())
-	server := &http.Server{Addr: listenAddr}
+	server := &http.Server{Addr: *webListenAddr}
 
 	go func() {
-		slog.Info(fmt.Sprintf("listening on %s", listenAddr))
+		slog.Info(fmt.Sprintf("listening on %s", *webListenAddr))
 		if err := server.ListenAndServe(); err != nil && err != http.ErrServerClosed {
 			log.Fatalf("http server error: %v", err)
 		}
