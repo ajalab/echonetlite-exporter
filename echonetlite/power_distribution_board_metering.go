@@ -29,7 +29,7 @@ func (p *PowerDistributionBoardMeteringClient) Get(ctx context.Context, host str
 			{EPC: epcUnitForCumulativeElectricEnergy, EDT: []byte{}},
 		},
 	}
-	resFrame, err := p.conn.unicast(ctx, host, getReq)
+	resFrame, err := p.conn.Unicast(ctx, host, getReq)
 	if err != nil {
 		return nil, err
 	}

@@ -11,15 +11,15 @@ type Node struct {
 	NodeProfile NodeProfile
 }
 
-type Scanner struct {
+type NodeProfileClient struct {
 	conn *Connection
 }
 
-func NewScanner(conn *Connection) Scanner {
-	return Scanner{conn: conn}
+func NewNodeProfileClient(conn *Connection) NodeProfileClient {
+	return NodeProfileClient{conn: conn}
 }
 
-func (s Scanner) Scan(ctx context.Context) ([]Node, error) {
+func (c NodeProfileClient) Scan(ctx context.Context) ([]Node, error) {
 	req := Frame{
 		SEOJ: EOJ{0x05, 0xFF, 0x01},
 		DEOJ: EOJ{0x0E, 0xF0, 0x01},
@@ -29,7 +29,7 @@ func (s Scanner) Scan(ctx context.Context) ([]Node, error) {
 			{EPC: 0xD6, EDT: []byte{}},
 		},
 	}
-	responses, err := s.conn.multicast(ctx, req)
+	responses, err := c.conn.Multicast(ctx, req)
 	if err != nil {
 		return nil, err
 	}

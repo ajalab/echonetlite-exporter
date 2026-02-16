@@ -31,7 +31,7 @@ func (p *PVPowerGenerationClient) Get(ctx context.Context, host string, eoj EOJ)
 			{EPC: epcCumulativeElectricEnergyOfGeneration, EDT: []byte{}},
 		},
 	}
-	resFrame, err := p.conn.unicast(ctx, host, getReq)
+	resFrame, err := p.conn.Unicast(ctx, host, getReq)
 	if err != nil {
 		return nil, err
 	}

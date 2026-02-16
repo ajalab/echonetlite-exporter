@@ -62,7 +62,7 @@ func TestPVPowerGenerationGetUsesGivenHostAndEOJ(t *testing.T) {
 		if !ok {
 			t.Fatalf("pending channel not found for tid=%d", frame.TID)
 		}
-		ch.(chan Response) <- Response{Frame: res, Addr: addr}
+		ch.(chan FrameAddr) <- FrameAddr{Frame: res, Addr: addr}
 		return len(packet), nil
 	}
 

@@ -13,11 +13,6 @@ import (
 	"golang.org/x/sys/unix"
 )
 
-type Response struct {
-	Frame *Frame
-	Addr  net.Addr
-}
-
 type Connection struct {
 	conn          net.PacketConn
 	connMulticast *ipv4.PacketConn
@@ -93,15 +88,15 @@ func (c *Connection) receiveLoop() {
 		}
 
 		if ch, ok := c.pending.Load(frame.TID); ok {
-			ch.(chan Response) <- Response{Frame: frame, Addr: addr}
+			ch.(chan FrameAddr) <- FrameAddr{Frame: frame, Addr: addr}
 		}
 	}
 }
 
-func (c *Connection) unicast(ctx context.Context, host string, req Frame) (*Frame, error) {
+func (c *Connection) Unicast(ctx context.Context, host string, req Frame) (*Frame, error) {
 	req.TID = uint16(atomic.AddUint32(&c.lastTID, 1) & 0xFFFF)
 
-	resCh := make(chan Response, 1)
+	resCh := make(chan FrameAddr, 1)
 	c.pending.Store(req.TID, resCh)
 	defer c.pending.Delete(req.TID)
 
@@ -122,10 +117,10 @@ func (c *Connection) unicast(ctx context.Context, host string, req Frame) (*Fram
 	}
 }
 
-func (c *Connection) multicast(ctx context.Context, req Frame) ([]Response, error) {
+func (c *Connection) Multicast(ctx context.Context, req Frame) ([]FrameAddr, error) {
 	req.TID = uint16(atomic.AddUint32(&c.lastTID, 1) & 0xFFFF)
 
-	resCh := make(chan Response, 100)
+	resCh := make(chan FrameAddr, 100)
 	c.pending.Store(req.TID, resCh)
 	defer c.pending.Delete(req.TID)
 
@@ -133,12 +128,12 @@ func (c *Connection) multicast(ctx context.Context, req Frame) ([]Response, erro
 		return nil, fmt.Errorf("write error: %w", err)
 	}
 
-	var results []Response
+	var results []FrameAddr
 
 	for {
 		select {
 		case res := <-resCh:
-			results = append(results, Response{
+			results = append(results, FrameAddr{
 				Frame: res.Frame,
 				Addr:  res.Addr,
 			})

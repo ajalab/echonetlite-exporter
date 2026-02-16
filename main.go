@@ -28,8 +28,8 @@ var (
 )
 
 type Exporter struct {
-	conn    *echonetlite.Connection
-	scanner echonetlite.Scanner
+	conn              *echonetlite.Connection
+	nodeProfileClient echonetlite.NodeProfileClient
 
 	pdbmCollector *collector.PowerDistributionBoardMeteringCollector
 	pvCollector   *collector.PVPowerGenerationCollector
@@ -52,11 +52,11 @@ func NewExporter(conn *echonetlite.Connection) *Exporter {
 		collectMetrics,
 	)
 	exporter := &Exporter{
-		conn:           conn,
-		scanner:        echonetlite.NewScanner(conn),
-		pdbmCollector:  pdbmCollector,
-		pvCollector:    pvCollector,
-		collectMetrics: collectMetrics,
+		conn:              conn,
+		nodeProfileClient: echonetlite.NewNodeProfileClient(conn),
+		pdbmCollector:     pdbmCollector,
+		pvCollector:       pvCollector,
+		collectMetrics:    collectMetrics,
 	}
 
 	return exporter
@@ -86,7 +86,7 @@ func (e *Exporter) scan(ctx context.Context) ([]echonetlite.Device, []echonetlit
 	defer cancel()
 
 	slog.Info("scanning ECHONET Lite nodes")
-	nodes, err := e.scanner.Scan(reqCtx)
+	nodes, err := e.nodeProfileClient.Scan(reqCtx)
 	if err != nil {
 		return nil, nil, err
 	}

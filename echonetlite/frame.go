@@ -4,6 +4,7 @@ import (
 	"bytes"
 	"encoding/binary"
 	"fmt"
+	"net"
 )
 
 type Property struct {
@@ -66,4 +67,9 @@ func Deserialize(data []byte) (*Frame, error) {
 		offset += pdc
 	}
 	return f, nil
+}
+
+type FrameAddr struct {
+	Frame *Frame
+	Addr  net.Addr
 }
