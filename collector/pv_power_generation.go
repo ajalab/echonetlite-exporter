@@ -12,9 +12,8 @@ import (
 )
 
 type PVPowerGenerationCollector struct {
-	objectUpdates <-chan []*echonetlite.PVPowerGeneration
-	interval      time.Duration
-	timeout       time.Duration
+	interval time.Duration
+	timeout  time.Duration
 
 	instantaneousPowerGauge *prometheus.GaugeVec
 	cumulativeEnergyDesc    *prometheus.Desc
@@ -30,15 +29,13 @@ type cumulativeEnergyKey struct {
 
 func NewPVPowerGenerationCollector(
 	conn *echonetlite.Connection,
-	updates <-chan []*echonetlite.PVPowerGeneration,
 	interval time.Duration,
 	timeout time.Duration,
 	collectMetrics *CollectMetrics,
 ) *PVPowerGenerationCollector {
 	return &PVPowerGenerationCollector{
-		objectUpdates: updates,
-		interval:      interval,
-		timeout:       timeout,
+		interval: interval,
+		timeout:  timeout,
 		instantaneousPowerGauge: prometheus.NewGaugeVec(
 			prometheus.GaugeOpts{
 				Name: "echonetlite_pv_power_generation_electric_power_generation_watts",
@@ -57,8 +54,8 @@ func NewPVPowerGenerationCollector(
 	}
 }
 
-func (c *PVPowerGenerationCollector) Start(ctx context.Context) {
-	go c.collectLoop(ctx)
+func (c *PVPowerGenerationCollector) Start(ctx context.Context, targets []*echonetlite.PVPowerGeneration) {
+	go c.collectLoop(ctx, targets)
 }
 
 func (c *PVPowerGenerationCollector) Describe(ch chan<- *prometheus.Desc) {
@@ -81,18 +78,15 @@ func (c *PVPowerGenerationCollector) Collect(ch chan<- prometheus.Metric) {
 	c.cumulativeEnergyMu.Unlock()
 }
 
-func (c *PVPowerGenerationCollector) collectLoop(ctx context.Context) {
+func (c *PVPowerGenerationCollector) collectLoop(ctx context.Context, targets []*echonetlite.PVPowerGeneration) {
 	ticker := time.NewTicker(c.interval)
 	defer ticker.Stop()
 
-	var pvs []*echonetlite.PVPowerGeneration
+	c.collect(ctx, targets)
 	for {
 		select {
 		case <-ticker.C:
-			c.collect(ctx, pvs)
-		case updated := <-c.objectUpdates:
-			pvs = updated
-			c.collect(ctx, pvs)
+			c.collect(ctx, targets)
 		case <-ctx.Done():
 			return
 		}

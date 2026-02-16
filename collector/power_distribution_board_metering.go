@@ -13,9 +13,8 @@ import (
 )
 
 type PowerDistributionBoardMeteringCollector struct {
-	objectUpdates <-chan []*echonetlite.PowerDistributionBoardMetering
-	interval      time.Duration
-	timeout       time.Duration
+	interval time.Duration
+	timeout  time.Duration
 
 	instantaneousElectricPowerSimplexGauge *prometheus.GaugeVec
 	cumulativeElectricEnergySimplexDesc    *prometheus.Desc
@@ -32,15 +31,13 @@ type cumulativeElectricEnergyKey struct {
 
 func NewPowerDistributionBoardMeteringCollector(
 	conn *echonetlite.Connection,
-	updates <-chan []*echonetlite.PowerDistributionBoardMetering,
 	interval time.Duration,
 	timeout time.Duration,
 	collectMetrics *CollectMetrics,
 ) *PowerDistributionBoardMeteringCollector {
 	return &PowerDistributionBoardMeteringCollector{
-		objectUpdates: updates,
-		interval:      interval,
-		timeout:       timeout,
+		interval: interval,
+		timeout:  timeout,
 		instantaneousElectricPowerSimplexGauge: prometheus.NewGaugeVec(
 			prometheus.GaugeOpts{
 				Name: "echonetlite_power_distribution_board_metering_electric_power_simplex_watts",
@@ -55,12 +52,12 @@ func NewPowerDistributionBoardMeteringCollector(
 			nil,
 		),
 		cumulativeElectricEnergySimplex: make(map[cumulativeElectricEnergyKey]float64),
-		collectMetrics: collectMetrics,
+		collectMetrics:                  collectMetrics,
 	}
 }
 
-func (c *PowerDistributionBoardMeteringCollector) Start(ctx context.Context) {
-	go c.collectLoop(ctx)
+func (c *PowerDistributionBoardMeteringCollector) Start(ctx context.Context, targets []*echonetlite.PowerDistributionBoardMetering) {
+	go c.collectLoop(ctx, targets)
 }
 
 func (c *PowerDistributionBoardMeteringCollector) Describe(ch chan<- *prometheus.Desc) {
@@ -84,18 +81,15 @@ func (c *PowerDistributionBoardMeteringCollector) Collect(ch chan<- prometheus.M
 	c.cumulativeElectricEnergySimplexMu.Unlock()
 }
 
-func (c *PowerDistributionBoardMeteringCollector) collectLoop(ctx context.Context) {
+func (c *PowerDistributionBoardMeteringCollector) collectLoop(ctx context.Context, targets []*echonetlite.PowerDistributionBoardMetering) {
 	ticker := time.NewTicker(c.interval)
 	defer ticker.Stop()
 
-	var pdbms []*echonetlite.PowerDistributionBoardMetering
+	c.collect(ctx, targets)
 	for {
 		select {
 		case <-ticker.C:
-			c.collect(ctx, pdbms)
-		case updated := <-c.objectUpdates:
-			pdbms = updated
-			c.collect(ctx, pdbms)
+			c.collect(ctx, targets)
 		case <-ctx.Done():
 			return
 		}

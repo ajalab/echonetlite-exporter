@@ -19,7 +19,7 @@ func NewScanner(conn *Connection) Scanner {
 	return Scanner{conn: conn}
 }
 
-func (s Scanner) ScanNodes(ctx context.Context) ([]Node, error) {
+func (s Scanner) Scan(ctx context.Context) ([]Node, error) {
 	req := Frame{
 		SEOJ: EOJ{0x05, 0xFF, 0x01},
 		DEOJ: EOJ{0x0E, 0xF0, 0x01},

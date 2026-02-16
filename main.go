@@ -22,7 +22,6 @@ import (
 var (
 	webListenAddr         = flag.String("net.listenAddr", ":9200", "Address to listen on for HTTP requests")
 	netMulticastInterface = flag.String("net.multicastInterface", "", "Network interface for UDP multicast")
-	scannerInterval       = flag.Duration("scanner.interval", 60*time.Second, "Interval for scanning ECHONET Lite nodes")
 	scannerTimeout        = flag.Duration("scanner.timeout", 10*time.Second, "Timeout for scanning ECHONET Lite nodes")
 	collectorInterval     = flag.Duration("collector.interval", 15*time.Second, "Interval for collecting metrics from nodes")
 	collectorTimeout      = flag.Duration("collector.timeout", 10*time.Second, "Timeout for collecting metrics from nodes")
@@ -32,45 +31,31 @@ type Exporter struct {
 	conn    *echonetlite.Connection
 	scanner echonetlite.Scanner
 
-	scanErrorsTotal prometheus.Counter
-
 	pdbmCollector *collector.PowerDistributionBoardMeteringCollector
-	pdbmUpdates   chan []*echonetlite.PowerDistributionBoardMetering
 	pvCollector   *collector.PVPowerGenerationCollector
-	pvUpdates     chan []*echonetlite.PVPowerGeneration
 
 	collectMetrics *collector.CollectMetrics
 }
 
 func NewExporter(conn *echonetlite.Connection) *Exporter {
-	pdbmUpdates := make(chan []*echonetlite.PowerDistributionBoardMetering)
 	collectMetrics := collector.NewCollectMetrics()
 	pdbmCollector := collector.NewPowerDistributionBoardMeteringCollector(
 		conn,
-		pdbmUpdates,
 		*collectorInterval,
 		*collectorTimeout,
 		collectMetrics,
 	)
-	pvUpdates := make(chan []*echonetlite.PVPowerGeneration)
 	pvCollector := collector.NewPVPowerGenerationCollector(
 		conn,
-		pvUpdates,
 		*collectorInterval,
 		*collectorTimeout,
 		collectMetrics,
 	)
 	exporter := &Exporter{
-		conn:    conn,
-		scanner: echonetlite.NewScanner(conn),
-		scanErrorsTotal: prometheus.NewCounter(prometheus.CounterOpts{
-			Name: "echonetlite_exporter_scan_errors_total",
-			Help: "Total number of scan errors.",
-		}),
+		conn:           conn,
+		scanner:        echonetlite.NewScanner(conn),
 		pdbmCollector:  pdbmCollector,
-		pdbmUpdates:    pdbmUpdates,
 		pvCollector:    pvCollector,
-		pvUpdates:      pvUpdates,
 		collectMetrics: collectMetrics,
 	}
 
@@ -79,44 +64,33 @@ func NewExporter(conn *echonetlite.Connection) *Exporter {
 
 func (e *Exporter) RegisterMetrics() {
 	prometheus.MustRegister(
-		e.scanErrorsTotal,
 		e.collectMetrics.Collector(),
 		e.pdbmCollector,
 		e.pvCollector,
 	)
 }
 
-func (e *Exporter) Start(ctx context.Context) {
-	go e.scanLoop(ctx)
-	e.pdbmCollector.Start(ctx)
-	e.pvCollector.Start(ctx)
-}
-
-func (e *Exporter) scanLoop(ctx context.Context) {
-	ticker := time.NewTicker(*scannerInterval)
-	defer ticker.Stop()
-
-	e.runScan(ctx)
-	for {
-		select {
-		case <-ticker.C:
-			e.runScan(ctx)
-		case <-ctx.Done():
-			return
-		}
+func (e *Exporter) Start(ctx context.Context) error {
+	pdbms, pvs, err := e.scan(ctx)
+	if err != nil {
+		return fmt.Errorf("failed to scan nodes: %v", err)
 	}
+
+	e.pdbmCollector.Start(ctx, pdbms)
+	e.pvCollector.Start(ctx, pvs)
+	return nil
 }
 
-func (e *Exporter) runScan(ctx context.Context) {
+func (e *Exporter) scan(ctx context.Context) ([]*echonetlite.PowerDistributionBoardMetering, []*echonetlite.PVPowerGeneration, error) {
 	reqCtx, cancel := context.WithTimeout(ctx, *scannerTimeout)
 	defer cancel()
 
-	nodes, err := e.scanner.ScanNodes(reqCtx)
+	slog.Info("scanning ECHONET Lite nodes")
+	nodes, err := e.scanner.Scan(reqCtx)
 	if err != nil {
-		e.scanErrorsTotal.Inc()
-		slog.Error("failed to scan nodes", "err", err)
-		return
+		return nil, nil, err
 	}
+	slog.Info(fmt.Sprintf("scanned %d ECHONET Lite nodes", len(nodes)))
 
 	var pdbms []*echonetlite.PowerDistributionBoardMetering
 	var pvs []*echonetlite.PVPowerGeneration
@@ -141,8 +115,8 @@ func (e *Exporter) runScan(ctx context.Context) {
 			}
 		}
 	}
-	e.pdbmUpdates <- pdbms
-	e.pvUpdates <- pvs
+
+	return pdbms, pvs, nil
 }
 
 func main() {
@@ -160,7 +134,9 @@ func main() {
 	ctx, cancel := context.WithCancel(context.Background())
 	defer cancel()
 
-	exporter.Start(ctx)
+	if err := exporter.Start(ctx); err != nil {
+		log.Fatalf("startup failed: %v", err)
+	}
 
 	http.Handle("/metrics", promhttp.Handler())
 	server := &http.Server{Addr: *webListenAddr}
