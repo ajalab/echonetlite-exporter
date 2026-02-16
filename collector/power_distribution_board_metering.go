@@ -15,6 +15,7 @@ import (
 type PowerDistributionBoardMeteringCollector struct {
 	interval time.Duration
 	timeout  time.Duration
+	client   *echonetlite.PowerDistributionBoardMeteringClient
 
 	instantaneousElectricPowerSimplexGauge *prometheus.GaugeVec
 	cumulativeElectricEnergySimplexDesc    *prometheus.Desc
@@ -38,6 +39,7 @@ func NewPowerDistributionBoardMeteringCollector(
 	return &PowerDistributionBoardMeteringCollector{
 		interval: interval,
 		timeout:  timeout,
+		client:   echonetlite.NewPowerDistributionBoardMeteringClient(conn),
 		instantaneousElectricPowerSimplexGauge: prometheus.NewGaugeVec(
 			prometheus.GaugeOpts{
 				Name: "echonetlite_power_distribution_board_metering_electric_power_simplex_watts",
@@ -56,7 +58,7 @@ func NewPowerDistributionBoardMeteringCollector(
 	}
 }
 
-func (c *PowerDistributionBoardMeteringCollector) Start(ctx context.Context, targets []*echonetlite.PowerDistributionBoardMetering) {
+func (c *PowerDistributionBoardMeteringCollector) Start(ctx context.Context, targets []echonetlite.Device) {
 	go c.collectLoop(ctx, targets)
 }
 
@@ -81,7 +83,7 @@ func (c *PowerDistributionBoardMeteringCollector) Collect(ch chan<- prometheus.M
 	c.cumulativeElectricEnergySimplexMu.Unlock()
 }
 
-func (c *PowerDistributionBoardMeteringCollector) collectLoop(ctx context.Context, targets []*echonetlite.PowerDistributionBoardMetering) {
+func (c *PowerDistributionBoardMeteringCollector) collectLoop(ctx context.Context, targets []echonetlite.Device) {
 	ticker := time.NewTicker(c.interval)
 	defer ticker.Stop()
 
@@ -96,43 +98,43 @@ func (c *PowerDistributionBoardMeteringCollector) collectLoop(ctx context.Contex
 	}
 }
 
-func (c *PowerDistributionBoardMeteringCollector) collect(ctx context.Context, pdbms []*echonetlite.PowerDistributionBoardMetering) {
-	for _, pdbm := range pdbms {
+func (c *PowerDistributionBoardMeteringCollector) collect(ctx context.Context, devices []echonetlite.Device) {
+	for _, device := range devices {
 		reqCtx, cancel := context.WithTimeout(ctx, c.timeout)
-		props, err := pdbm.Get(reqCtx)
+		props, err := c.client.Get(reqCtx, device.Host(), device.EOJ())
 		cancel()
 
 		if err != nil {
-			c.collectMetrics.SetSuccess(pdbm.Host(), pdbm.EOJ().String(), false)
-			slog.Warn("failed to collect stats", "host", pdbm.Host(), "eoj", pdbm.EOJ().String(), "err", err)
+			c.collectMetrics.SetSuccess(device.Host(), device.EOJ().String(), false)
+			slog.Warn("failed to collect stats", "host", device.Host(), "eoj", device.EOJ().String(), "err", err)
 			continue
 		}
-		c.collectMetrics.SetSuccess(pdbm.Host(), pdbm.EOJ().String(), true)
+		c.collectMetrics.SetSuccess(device.Host(), device.EOJ().String(), true)
 
-		c.updateMetrics(pdbm, props)
+		c.updateMetrics(device, props)
 	}
 }
 
 func (c *PowerDistributionBoardMeteringCollector) updateMetrics(
+	device echonetlite.Device,
 	pdbm *echonetlite.PowerDistributionBoardMetering,
-	props *echonetlite.PowerDistributionBoardMeteringProps,
 ) {
 	{
-		start := int(props.InstantaneousElectricPowerListSimplex.StartChannel)
-		for i, val := range props.InstantaneousElectricPowerListSimplex.InstantaneousElectricPower {
+		start := int(pdbm.InstantaneousElectricPowerListSimplex.StartChannel)
+		for i, val := range pdbm.InstantaneousElectricPowerListSimplex.InstantaneousElectricPower {
 			channel := fmt.Sprintf("%d", start+i)
-			c.instantaneousElectricPowerSimplexGauge.WithLabelValues(pdbm.Host(), pdbm.EOJ().String(), channel).Set(float64(val))
+			c.instantaneousElectricPowerSimplexGauge.WithLabelValues(device.Host(), device.EOJ().String(), channel).Set(float64(val))
 		}
 	}
 	{
-		start := int(props.CumulativeElectricEnergyListSimplex.StartChannel)
+		start := int(pdbm.CumulativeElectricEnergyListSimplex.StartChannel)
 		c.cumulativeElectricEnergySimplexMu.Lock()
-		for i, val := range props.CumulativeElectricEnergyListSimplex.ElectricEnergy {
+		for i, val := range pdbm.CumulativeElectricEnergyListSimplex.ElectricEnergy {
 			channel := fmt.Sprintf("%d", start+i)
-			cumulativeValue := float64(val) * float64(props.UnitForCumulativeEnergy) * 1000 * 3600 // kWh to J
+			cumulativeValue := float64(val) * float64(pdbm.UnitForCumulativeEnergy) * 1000 * 3600 // kWh to J
 			key := cumulativeElectricEnergyKey{
-				host:    pdbm.Host(),
-				eoj:     pdbm.EOJ().String(),
+				host:    device.Host(),
+				eoj:     device.EOJ().String(),
 				channel: channel,
 			}
 			c.cumulativeElectricEnergySimplex[key] = cumulativeValue

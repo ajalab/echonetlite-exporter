@@ -14,6 +14,7 @@ import (
 type PVPowerGenerationCollector struct {
 	interval time.Duration
 	timeout  time.Duration
+	client   *echonetlite.PVPowerGenerationClient
 
 	instantaneousPowerGauge *prometheus.GaugeVec
 	cumulativeEnergyDesc    *prometheus.Desc
@@ -36,6 +37,7 @@ func NewPVPowerGenerationCollector(
 	return &PVPowerGenerationCollector{
 		interval: interval,
 		timeout:  timeout,
+		client:   echonetlite.NewPVPowerGenerationClient(conn),
 		instantaneousPowerGauge: prometheus.NewGaugeVec(
 			prometheus.GaugeOpts{
 				Name: "echonetlite_pv_power_generation_electric_power_generation_watts",
@@ -54,7 +56,7 @@ func NewPVPowerGenerationCollector(
 	}
 }
 
-func (c *PVPowerGenerationCollector) Start(ctx context.Context, targets []*echonetlite.PVPowerGeneration) {
+func (c *PVPowerGenerationCollector) Start(ctx context.Context, targets []echonetlite.Device) {
 	go c.collectLoop(ctx, targets)
 }
 
@@ -78,7 +80,7 @@ func (c *PVPowerGenerationCollector) Collect(ch chan<- prometheus.Metric) {
 	c.cumulativeEnergyMu.Unlock()
 }
 
-func (c *PVPowerGenerationCollector) collectLoop(ctx context.Context, targets []*echonetlite.PVPowerGeneration) {
+func (c *PVPowerGenerationCollector) collectLoop(ctx context.Context, targets []echonetlite.Device) {
 	ticker := time.NewTicker(c.interval)
 	defer ticker.Stop()
 
@@ -93,34 +95,34 @@ func (c *PVPowerGenerationCollector) collectLoop(ctx context.Context, targets []
 	}
 }
 
-func (c *PVPowerGenerationCollector) collect(ctx context.Context, pvs []*echonetlite.PVPowerGeneration) {
-	for _, pv := range pvs {
+func (c *PVPowerGenerationCollector) collect(ctx context.Context, devices []echonetlite.Device) {
+	for _, device := range devices {
 		reqCtx, cancel := context.WithTimeout(ctx, c.timeout)
-		props, err := pv.Get(reqCtx)
+		props, err := c.client.Get(reqCtx, device.Host(), device.EOJ())
 		cancel()
 
 		if err != nil {
-			c.collectMetrics.SetSuccess(pv.Host(), pv.EOJ().String(), false)
-			slog.Warn("failed to collect stats", "host", pv.Host(), "eoj", pv.EOJ().String(), "err", err)
+			c.collectMetrics.SetSuccess(device.Host(), device.EOJ().String(), false)
+			slog.Warn("failed to collect stats", "host", device.Host(), "eoj", device.EOJ().String(), "err", err)
 			continue
 		}
-		c.collectMetrics.SetSuccess(pv.Host(), pv.EOJ().String(), true)
+		c.collectMetrics.SetSuccess(device.Host(), device.EOJ().String(), true)
 
-		c.updateMetrics(pv, props)
+		c.updateMetrics(device, props)
 	}
 }
 
 func (c *PVPowerGenerationCollector) updateMetrics(
-	pv *echonetlite.PVPowerGeneration,
-	props *echonetlite.PVPowerGenerationProps,
+	device echonetlite.Device,
+	pvpg *echonetlite.PVPowerGeneration,
 ) {
-	c.instantaneousPowerGauge.WithLabelValues(pv.Host(), pv.EOJ().String()).Set(float64(props.InstantaneousElectricPowerGeneration))
+	c.instantaneousPowerGauge.WithLabelValues(device.Host(), device.EOJ().String()).Set(float64(pvpg.InstantaneousElectricPowerGeneration))
 
-	kWh := float64(props.CumulativeElectricEnergyOfGeneration) * 0.001
+	kWh := float64(pvpg.CumulativeElectricEnergyOfGeneration) * 0.001
 	joules := kWh * 3600000
 	key := cumulativeEnergyKey{
-		host: pv.Host(),
-		eoj:  pv.EOJ().String(),
+		host: device.Host(),
+		eoj:  device.EOJ().String(),
 	}
 	c.cumulativeEnergyMu.Lock()
 	c.cumulativeEnergy[key] = joules

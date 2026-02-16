@@ -81,7 +81,7 @@ func (e *Exporter) Start(ctx context.Context) error {
 	return nil
 }
 
-func (e *Exporter) scan(ctx context.Context) ([]*echonetlite.PowerDistributionBoardMetering, []*echonetlite.PVPowerGeneration, error) {
+func (e *Exporter) scan(ctx context.Context) ([]echonetlite.Device, []echonetlite.Device, error) {
 	reqCtx, cancel := context.WithTimeout(ctx, *scannerTimeout)
 	defer cancel()
 
@@ -92,31 +92,22 @@ func (e *Exporter) scan(ctx context.Context) ([]*echonetlite.PowerDistributionBo
 	}
 	slog.Info(fmt.Sprintf("scanned %d ECHONET Lite nodes", len(nodes)))
 
-	var pdbms []*echonetlite.PowerDistributionBoardMetering
-	var pvs []*echonetlite.PVPowerGeneration
+	var pdbms []echonetlite.Device
+	var pvpgs []echonetlite.Device
 	for _, node := range nodes {
 		nodeProfile := node.NodeProfile
 		for _, eoj := range nodeProfile.SelfNodeInstanceListS {
-			if eoj[0] == 0x02 && eoj[1] == 0x87 {
-				pdbms = append(pdbms, echonetlite.NewPowerDistributionBoardMetering(
-					node.Host,
-					eoj,
-					e.conn,
-				),
-				)
-			}
-			if eoj[0] == 0x02 && eoj[1] == 0x79 {
-				pvs = append(pvs, echonetlite.NewPVPowerGeneration(
-					node.Host,
-					eoj,
-					e.conn,
-				),
-				)
+			class := eoj.Class()
+			switch class {
+			case echonetlite.ClassPowerDistributionBoardMetering:
+				pdbms = append(pdbms, echonetlite.NewDevice(node.Host, eoj))
+			case echonetlite.ClassPVPowerGeneration:
+				pvpgs = append(pvpgs, echonetlite.NewDevice(node.Host, eoj))
 			}
 		}
 	}
 
-	return pdbms, pvs, nil
+	return pdbms, pvpgs, nil
 }
 
 func main() {

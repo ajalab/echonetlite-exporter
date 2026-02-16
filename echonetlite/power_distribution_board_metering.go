@@ -8,32 +8,20 @@ const (
 	epcUnitForCumulativeElectricEnergy       = 0xC2
 )
 
-type PowerDistributionBoardMetering struct {
-	host string
-	eoj  EOJ
+type PowerDistributionBoardMeteringClient struct {
 	conn *Connection
 }
 
-func NewPowerDistributionBoardMetering(host string, eoj EOJ, conn *Connection) *PowerDistributionBoardMetering {
-	return &PowerDistributionBoardMetering{
-		host: host,
-		eoj:  eoj,
+func NewPowerDistributionBoardMeteringClient(conn *Connection) *PowerDistributionBoardMeteringClient {
+	return &PowerDistributionBoardMeteringClient{
 		conn: conn,
 	}
 }
 
-func (p *PowerDistributionBoardMetering) Host() string {
-	return p.host
-}
-
-func (p *PowerDistributionBoardMetering) EOJ() EOJ {
-	return p.eoj
-}
-
-func (p *PowerDistributionBoardMetering) Get(ctx context.Context) (*PowerDistributionBoardMeteringProps, error) {
+func (p *PowerDistributionBoardMeteringClient) Get(ctx context.Context, host string, eoj EOJ) (*PowerDistributionBoardMetering, error) {
 	getReq := Frame{
 		SEOJ: EOJ{0x05, 0xFF, 0x01},
-		DEOJ: EOJ{0x02, 0x87, 0x01},
+		DEOJ: eoj,
 		ESV:  0x62,
 		Properties: []Property{
 			{EPC: epcCumulativeElectricEnergyListSimplex, EDT: []byte{}},
@@ -41,7 +29,7 @@ func (p *PowerDistributionBoardMetering) Get(ctx context.Context) (*PowerDistrib
 			{EPC: epcUnitForCumulativeElectricEnergy, EDT: []byte{}},
 		},
 	}
-	resFrame, err := p.conn.unicast(ctx, p.host, getReq)
+	resFrame, err := p.conn.unicast(ctx, host, getReq)
 	if err != nil {
 		return nil, err
 	}
@@ -60,14 +48,14 @@ func (p *PowerDistributionBoardMetering) Get(ctx context.Context) (*PowerDistrib
 		}
 	}
 
-	return &PowerDistributionBoardMeteringProps{
+	return &PowerDistributionBoardMetering{
 		InstantaneousElectricPowerListSimplex: instantaneousElectricPowerListSimplex,
 		CumulativeElectricEnergyListSimplex:   cumulativeElectricEnergyListSimplex,
 		UnitForCumulativeEnergy:               unitForCumulativeEnergy,
 	}, nil
 }
 
-type PowerDistributionBoardMeteringProps struct {
+type PowerDistributionBoardMetering struct {
 	// This property indicates the measured cumulative amount of electric power
 	// consumption of a measurement channel specified by the property of 'Channel
 	// range specification for cumulative amount of electric power consumption
