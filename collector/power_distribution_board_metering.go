@@ -16,6 +16,7 @@ type PowerDistributionBoardMeteringCollector struct {
 	interval time.Duration
 	timeout  time.Duration
 	client   *echonetlite.PowerDistributionBoardMeteringClient
+	targets  []echonetlite.Device
 
 	instantaneousElectricPowerSimplexGauge *prometheus.GaugeVec
 	cumulativeElectricEnergySimplexDesc    *prometheus.Desc
@@ -35,11 +36,13 @@ func NewPowerDistributionBoardMeteringCollector(
 	interval time.Duration,
 	timeout time.Duration,
 	collectMetrics *CollectMetrics,
+	targets []echonetlite.Device,
 ) *PowerDistributionBoardMeteringCollector {
 	return &PowerDistributionBoardMeteringCollector{
 		interval: interval,
 		timeout:  timeout,
 		client:   echonetlite.NewPowerDistributionBoardMeteringClient(conn),
+		targets:  targets,
 		instantaneousElectricPowerSimplexGauge: prometheus.NewGaugeVec(
 			prometheus.GaugeOpts{
 				Name: "echonetlite_power_distribution_board_metering_electric_power_simplex_watts",
@@ -58,8 +61,8 @@ func NewPowerDistributionBoardMeteringCollector(
 	}
 }
 
-func (c *PowerDistributionBoardMeteringCollector) Start(ctx context.Context, targets []echonetlite.Device) {
-	go c.collectLoop(ctx, targets)
+func (c *PowerDistributionBoardMeteringCollector) Start(ctx context.Context) {
+	go c.collectLoop(ctx, c.targets)
 }
 
 func (c *PowerDistributionBoardMeteringCollector) Describe(ch chan<- *prometheus.Desc) {

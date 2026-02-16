@@ -9,7 +9,7 @@ import (
 )
 
 func TestPVUpdateMetricsUsesDeviceLabels(t *testing.T) {
-	c := NewPVPowerGenerationCollector(nil, 0, 0, NewCollectMetrics())
+	c := NewPVPowerGenerationCollector(nil, 0, 0, NewCollectMetrics(), nil)
 	device := echonetlite.NewDevice("192.0.2.10", echonetlite.EOJ{0x02, 0x79, 0x01})
 	pvpg := &echonetlite.PVPowerGeneration{
 		InstantaneousElectricPowerGeneration: 321,

@@ -15,6 +15,7 @@ type PVPowerGenerationCollector struct {
 	interval time.Duration
 	timeout  time.Duration
 	client   *echonetlite.PVPowerGenerationClient
+	targets  []echonetlite.Device
 
 	instantaneousPowerGauge *prometheus.GaugeVec
 	cumulativeEnergyDesc    *prometheus.Desc
@@ -33,11 +34,13 @@ func NewPVPowerGenerationCollector(
 	interval time.Duration,
 	timeout time.Duration,
 	collectMetrics *CollectMetrics,
+	targets []echonetlite.Device,
 ) *PVPowerGenerationCollector {
 	return &PVPowerGenerationCollector{
 		interval: interval,
 		timeout:  timeout,
 		client:   echonetlite.NewPVPowerGenerationClient(conn),
+		targets:  targets,
 		instantaneousPowerGauge: prometheus.NewGaugeVec(
 			prometheus.GaugeOpts{
 				Name: "echonetlite_pv_power_generation_electric_power_generation_watts",
@@ -56,8 +59,8 @@ func NewPVPowerGenerationCollector(
 	}
 }
 
-func (c *PVPowerGenerationCollector) Start(ctx context.Context, targets []echonetlite.Device) {
-	go c.collectLoop(ctx, targets)
+func (c *PVPowerGenerationCollector) Start(ctx context.Context) {
+	go c.collectLoop(ctx, c.targets)
 }
 
 func (c *PVPowerGenerationCollector) Describe(ch chan<- *prometheus.Desc) {

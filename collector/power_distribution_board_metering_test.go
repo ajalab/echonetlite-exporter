@@ -10,7 +10,7 @@ import (
 )
 
 func TestPDBMUpdateMetricsUsesDeviceLabels(t *testing.T) {
-	c := NewPowerDistributionBoardMeteringCollector(nil, 0, 0, NewCollectMetrics())
+	c := NewPowerDistributionBoardMeteringCollector(nil, 0, 0, NewCollectMetrics(), nil)
 	device := echonetlite.NewDevice("192.0.2.11", echonetlite.EOJ{0x02, 0x87, 0x01})
 	pdbm := &echonetlite.PowerDistributionBoardMetering{
 		InstantaneousElectricPowerListSimplex: echonetlite.InstantaneousElectricPowerListSimplex{

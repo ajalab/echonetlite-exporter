@@ -28,8 +28,7 @@ var (
 )
 
 type Exporter struct {
-	conn              *echonetlite.Connection
-	nodeProfileClient echonetlite.NodeProfileClient
+	conn *echonetlite.Connection
 
 	pdbmCollector *collector.PowerDistributionBoardMeteringCollector
 	pvCollector   *collector.PVPowerGenerationCollector
@@ -37,26 +36,31 @@ type Exporter struct {
 	collectMetrics *collector.CollectMetrics
 }
 
-func NewExporter(conn *echonetlite.Connection) *Exporter {
+func NewExporter(
+	conn *echonetlite.Connection,
+	pdbmTargets []echonetlite.Device,
+	pvTargets []echonetlite.Device,
+) *Exporter {
 	collectMetrics := collector.NewCollectMetrics()
 	pdbmCollector := collector.NewPowerDistributionBoardMeteringCollector(
 		conn,
 		*collectorInterval,
 		*collectorTimeout,
 		collectMetrics,
+		pdbmTargets,
 	)
 	pvCollector := collector.NewPVPowerGenerationCollector(
 		conn,
 		*collectorInterval,
 		*collectorTimeout,
 		collectMetrics,
+		pvTargets,
 	)
 	exporter := &Exporter{
-		conn:              conn,
-		nodeProfileClient: echonetlite.NewNodeProfileClient(conn),
-		pdbmCollector:     pdbmCollector,
-		pvCollector:       pvCollector,
-		collectMetrics:    collectMetrics,
+		conn:           conn,
+		pdbmCollector:  pdbmCollector,
+		pvCollector:    pvCollector,
+		collectMetrics: collectMetrics,
 	}
 
 	return exporter
@@ -70,23 +74,22 @@ func (e *Exporter) RegisterMetrics() {
 	)
 }
 
-func (e *Exporter) Start(ctx context.Context) error {
-	pdbms, pvs, err := e.scan(ctx)
-	if err != nil {
-		return fmt.Errorf("failed to scan nodes: %v", err)
-	}
-
-	e.pdbmCollector.Start(ctx, pdbms)
-	e.pvCollector.Start(ctx, pvs)
-	return nil
+func (e *Exporter) Start(ctx context.Context) {
+	e.pdbmCollector.Start(ctx)
+	e.pvCollector.Start(ctx)
 }
 
-func (e *Exporter) scan(ctx context.Context) ([]echonetlite.Device, []echonetlite.Device, error) {
+func scanTargets(
+	ctx context.Context,
+	conn *echonetlite.Connection,
+) ([]echonetlite.Device, []echonetlite.Device, error) {
 	reqCtx, cancel := context.WithTimeout(ctx, *scannerTimeout)
 	defer cancel()
 
+	nodeProfileClient := echonetlite.NewNodeProfileClient(conn)
+
 	slog.Info("scanning ECHONET Lite nodes")
-	nodes, err := e.nodeProfileClient.Scan(reqCtx)
+	nodes, err := nodeProfileClient.Scan(reqCtx)
 	if err != nil {
 		return nil, nil, err
 	}
@@ -113,21 +116,8 @@ func (e *Exporter) scan(ctx context.Context) ([]echonetlite.Device, []echonetlit
 func main() {
 	flag.Parse()
 
-	conn, err := echonetlite.NewConnection(*netMulticastInterface)
-	if err != nil {
-		log.Fatalf("connection error: %v", err)
-	}
-	defer conn.Close()
-
-	exporter := NewExporter(conn)
-	exporter.RegisterMetrics()
-
 	ctx, cancel := context.WithCancel(context.Background())
 	defer cancel()
-
-	if err := exporter.Start(ctx); err != nil {
-		log.Fatalf("startup failed: %v", err)
-	}
 
 	http.Handle("/metrics", promhttp.Handler())
 	server := &http.Server{Addr: *webListenAddr}
@@ -138,6 +128,21 @@ func main() {
 			log.Fatalf("http server error: %v", err)
 		}
 	}()
+
+	conn, err := echonetlite.NewConnection(*netMulticastInterface)
+	if err != nil {
+		log.Fatalf("connection error: %v", err)
+	}
+	defer conn.Close()
+
+	pdbms, pvs, err := scanTargets(ctx, conn)
+	if err != nil {
+		log.Fatalf("startup failed: failed to scan nodes: %v", err)
+	}
+
+	exporter := NewExporter(conn, pdbms, pvs)
+	exporter.RegisterMetrics()
+	exporter.Start(ctx)
 
 	sigCh := make(chan os.Signal, 1)
 	signal.Notify(sigCh, os.Interrupt, syscall.SIGTERM)
