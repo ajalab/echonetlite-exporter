@@ -20,11 +20,11 @@ import (
 )
 
 var (
-	webListenAddr         = flag.String("net.listenAddr", ":9200", "Address to listen on for HTTP requests")
+	webListenAddr         = flag.String("web.listenAddr", ":9200", "Address to listen on for HTTP requests")
 	netMulticastInterface = flag.String("net.multicastInterface", "", "Network interface for UDP multicast")
-	scannerTimeout        = flag.Duration("scanner.timeout", 10*time.Second, "Timeout for scanning ECHONET Lite nodes")
-	collectorInterval     = flag.Duration("collector.interval", 15*time.Second, "Interval for collecting metrics from nodes")
-	collectorTimeout      = flag.Duration("collector.timeout", 10*time.Second, "Timeout for collecting metrics from nodes")
+	discoveryScanDuration = flag.Duration("discovery.scanDuration", 10*time.Second, "Duration for scanning ECHONET Lite nodes")
+	collectorInterval     = flag.Duration("collector.interval", 15*time.Second, "Interval for collecting metrics from ECHONET Lite devices")
+	collectorTimeout      = flag.Duration("collector.timeout", 10*time.Second, "Timeout for collecting metrics from ECHONET Lite devices")
 )
 
 type Exporter struct {
@@ -83,7 +83,7 @@ func scanTargets(
 	ctx context.Context,
 	conn *echonetlite.Connection,
 ) ([]echonetlite.Device, []echonetlite.Device, error) {
-	reqCtx, cancel := context.WithTimeout(ctx, *scannerTimeout)
+	reqCtx, cancel := context.WithTimeout(ctx, *discoveryScanDuration)
 	defer cancel()
 
 	nodeProfileClient := echonetlite.NewNodeProfileClient(conn)
