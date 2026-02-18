@@ -1,4 +1,4 @@
-module echonetlite-exporter
+module github.com/ajalab/echonetlite-exporter
 
 go 1.25.5
 

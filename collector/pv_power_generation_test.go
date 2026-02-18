@@ -3,8 +3,7 @@ package collector
 import (
 	"testing"
 
-	"echonetlite-exporter/echonetlite"
-
+	"github.com/ajalab/echonetlite-exporter/echonetlite"
 	"github.com/prometheus/client_golang/prometheus/testutil"
 )
 

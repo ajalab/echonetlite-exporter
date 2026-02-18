@@ -12,9 +12,8 @@ import (
 	"syscall"
 	"time"
 
-	"echonetlite-exporter/collector"
-	"echonetlite-exporter/echonetlite"
-
+	"github.com/ajalab/echonetlite-exporter/collector"
+	"github.com/ajalab/echonetlite-exporter/echonetlite"
 	"github.com/prometheus/client_golang/prometheus"
 	"github.com/prometheus/client_golang/prometheus/promhttp"
 )
