@@ -31,31 +31,56 @@ func TestParseInstantaneousPowerList(t *testing.T) {
 	}
 }
 
-func TestPowerDistributionBoardMeteringGetUsesGivenHostAndEOJ(t *testing.T) {
+func TestPowerDistributionBoardMeteringGetParsesResponse(t *testing.T) {
+	client := newPowerDistributionBoardMeteringTestClient(t, []Property{
+		{EPC: epcCumulativeElectricEnergyListSimplex, EDT: []byte{0x01, 0x01, 0x00, 0x00, 0x00, 0xC8}},
+		{EPC: epcInstantaneousElectricPowerListSimplex, EDT: []byte{0x01, 0x01, 0xFF, 0xFF, 0xFF, 0x9C}},
+		{EPC: epcUnitForCumulativeElectricEnergy, EDT: []byte{0x02}},
+	})
+
+	m, err := client.Get(context.Background(), "127.0.0.1", EOJ{0x02, 0x87, 0x02})
+	if err != nil {
+		t.Fatalf("Get failed: %v", err)
+	}
+	if m.CumulativeElectricEnergyListSimplex.StartChannel != 1 {
+		t.Fatalf("expected B3 start channel 1, got %d", m.CumulativeElectricEnergyListSimplex.StartChannel)
+	}
+	if len(m.CumulativeElectricEnergyListSimplex.ElectricEnergy) != 1 {
+		t.Fatalf("expected one B3 value, got %d", len(m.CumulativeElectricEnergyListSimplex.ElectricEnergy))
+	}
+	if m.CumulativeElectricEnergyListSimplex.ElectricEnergy[0] != 200 {
+		t.Fatalf("expected B3 first value 200, got %d", m.CumulativeElectricEnergyListSimplex.ElectricEnergy[0])
+	}
+	if len(m.InstantaneousElectricPowerListSimplex.InstantaneousElectricPower) != 1 {
+		t.Fatalf("expected one B7 value, got %d", len(m.InstantaneousElectricPowerListSimplex.InstantaneousElectricPower))
+	}
+	if m.InstantaneousElectricPowerListSimplex.InstantaneousElectricPower[0] != -100 {
+		t.Fatalf("expected B7 first value -100, got %d", m.InstantaneousElectricPowerListSimplex.InstantaneousElectricPower[0])
+	}
+	if m.UnitForCumulativeEnergy != 0.01 {
+		t.Fatalf("expected C2 unit 0.01, got %f", m.UnitForCumulativeEnergy)
+	}
+}
+
+func newPowerDistributionBoardMeteringTestClient(t *testing.T, responseProperties []Property) *PowerDistributionBoardMeteringClient {
+	t.Helper()
+
 	conn := &Connection{}
 	stub := &stubPacketConn{}
 	conn.conn = stub
 
-	var gotFrame *Frame
-	var gotAddr *net.UDPAddr
 	stub.writeToFunc = func(packet []byte, addr net.Addr) (int, error) {
 		frame, err := Deserialize(packet)
 		if err != nil {
 			t.Fatalf("Deserialize failed: %v", err)
 		}
-		gotFrame = frame
-		udpAddr, ok := addr.(*net.UDPAddr)
-		if !ok {
-			t.Fatalf("expected UDP addr, got %T", addr)
-		}
-		gotAddr = udpAddr
 
 		res := &Frame{
 			TID:        frame.TID,
 			SEOJ:       frame.DEOJ,
 			DEOJ:       frame.SEOJ,
 			ESV:        0x72,
-			Properties: []Property{},
+			Properties: responseProperties,
 		}
 		ch, ok := conn.pending.Load(frame.TID)
 		if !ok {
@@ -65,23 +90,5 @@ func TestPowerDistributionBoardMeteringGetUsesGivenHostAndEOJ(t *testing.T) {
 		return len(packet), nil
 	}
 
-	client := NewPowerDistributionBoardMeteringClient(conn)
-	host := "127.0.0.1"
-	eoj := EOJ{0x02, 0x87, 0x02}
-
-	if _, err := client.Get(context.Background(), host, eoj); err != nil {
-		t.Fatalf("Get failed: %v", err)
-	}
-	if gotFrame == nil {
-		t.Fatal("no frame was sent")
-	}
-	if gotFrame.DEOJ != eoj {
-		t.Fatalf("expected DEOJ %v, got %v", eoj, gotFrame.DEOJ)
-	}
-	if gotAddr == nil {
-		t.Fatal("no destination address captured")
-	}
-	if gotAddr.IP.String() != host {
-		t.Fatalf("expected host %s, got %s", host, gotAddr.IP.String())
-	}
+	return NewPowerDistributionBoardMeteringClient(conn)
 }

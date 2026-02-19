@@ -1,6 +1,9 @@
 package echonetlite
 
-import "context"
+import (
+	"context"
+	"fmt"
+)
 
 const (
 	epcCumulativeElectricEnergyListSimplex   = 0xB3
@@ -33,6 +36,9 @@ func (p *PowerDistributionBoardMeteringClient) Get(ctx context.Context, host str
 	if err != nil {
 		return nil, err
 	}
+	if len(resFrame.Properties) != len(getReq.Properties) {
+		return nil, fmt.Errorf("unexpected property count: got %d, want %d", len(resFrame.Properties), len(getReq.Properties))
+	}
 
 	var instantaneousElectricPowerListSimplex InstantaneousElectricPowerListSimplex
 	var cumulativeElectricEnergyListSimplex CumulativeElectricEnergyListSimplex
@@ -45,6 +51,8 @@ func (p *PowerDistributionBoardMeteringClient) Get(ctx context.Context, host str
 			cumulativeElectricEnergyListSimplex = parseCumulativeElectricEnergyListSimplex(p.EDT)
 		case epcUnitForCumulativeElectricEnergy:
 			unitForCumulativeEnergy = parseUnitForCumulativeEnergy(p.EDT)
+		default:
+			return nil, fmt.Errorf("unexpected EPC: 0x%X", p.EPC)
 		}
 	}
 
