@@ -35,6 +35,9 @@ func (p *PVPowerGenerationClient) Get(ctx context.Context, host string, eoj EOJ)
 	if err != nil {
 		return nil, err
 	}
+	if len(resFrame.Properties) != len(getReq.Properties) {
+		return nil, fmt.Errorf("unexpected property count: got %d, want %d", len(resFrame.Properties), len(getReq.Properties))
+	}
 
 	pvpg := &PVPowerGeneration{}
 	for _, prop := range resFrame.Properties {
@@ -51,6 +54,8 @@ func (p *PVPowerGenerationClient) Get(ctx context.Context, host string, eoj EOJ)
 				return nil, fmt.Errorf("invalid cumulativeElectricEnergyOfGeneration data: %w", err)
 			}
 			pvpg.CumulativeElectricEnergyOfGeneration = val
+		default:
+			return nil, fmt.Errorf("unexpected EPC: 0x%X", prop.EPC)
 		}
 	}
 

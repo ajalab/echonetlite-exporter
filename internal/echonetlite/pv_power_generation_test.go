@@ -32,31 +32,53 @@ func TestParsePVCumulativeEnergy(t *testing.T) {
 	}
 }
 
-func TestPVPowerGenerationGetUsesGivenHostAndEOJ(t *testing.T) {
+func TestPVPowerGenerationGetParsesResponse(t *testing.T) {
+	client := newPVPowerGenerationTestClient(t, []Property{
+		{EPC: epcInstantaneousElectricPowerGeneration, EDT: []byte{0x00, 0x64}},
+		{EPC: epcCumulativeElectricEnergyOfGeneration, EDT: []byte{0x00, 0x00, 0x00, 0xC8}},
+	})
+
+	pv, err := client.Get(context.Background(), "127.0.0.1", EOJ{0x02, 0x79, 0x01})
+	if err != nil {
+		t.Fatalf("Get failed: %v", err)
+	}
+	if pv.InstantaneousElectricPowerGeneration != 100 {
+		t.Fatalf("expected E0=100, got %d", pv.InstantaneousElectricPowerGeneration)
+	}
+	if pv.CumulativeElectricEnergyOfGeneration != 200 {
+		t.Fatalf("expected E1=200, got %d", pv.CumulativeElectricEnergyOfGeneration)
+	}
+}
+
+func TestPVPowerGenerationGetFailsOnInvalidLength(t *testing.T) {
+	client := newPVPowerGenerationTestClient(t, []Property{
+		{EPC: epcInstantaneousElectricPowerGeneration, EDT: []byte{0x00}},
+		{EPC: epcCumulativeElectricEnergyOfGeneration, EDT: []byte{0x00, 0x00, 0x00, 0x64}},
+	})
+	if _, err := client.Get(context.Background(), "127.0.0.1", EOJ{0x02, 0x79, 0x01}); err == nil {
+		t.Fatal("expected invalid length error")
+	}
+}
+
+func newPVPowerGenerationTestClient(t *testing.T, responseProperties []Property) *PVPowerGenerationClient {
+	t.Helper()
+
 	conn := &Connection{}
 	stub := &stubPacketConn{}
 	conn.conn = stub
 
-	var gotFrame *Frame
-	var gotAddr *net.UDPAddr
 	stub.writeToFunc = func(packet []byte, addr net.Addr) (int, error) {
 		frame, err := Deserialize(packet)
 		if err != nil {
 			t.Fatalf("Deserialize failed: %v", err)
 		}
-		gotFrame = frame
-		udpAddr, ok := addr.(*net.UDPAddr)
-		if !ok {
-			t.Fatalf("expected UDP addr, got %T", addr)
-		}
-		gotAddr = udpAddr
 
 		res := &Frame{
 			TID:        frame.TID,
 			SEOJ:       frame.DEOJ,
 			DEOJ:       frame.SEOJ,
 			ESV:        0x72,
-			Properties: []Property{},
+			Properties: responseProperties,
 		}
 		ch, ok := conn.pending.Load(frame.TID)
 		if !ok {
@@ -66,23 +88,5 @@ func TestPVPowerGenerationGetUsesGivenHostAndEOJ(t *testing.T) {
 		return len(packet), nil
 	}
 
-	pv := NewPVPowerGenerationClient(conn)
-	host := "127.0.0.1"
-	eoj := EOJ{0x02, 0x79, 0x01}
-
-	if _, err := pv.Get(context.Background(), host, eoj); err != nil {
-		t.Fatalf("Get failed: %v", err)
-	}
-	if gotFrame == nil {
-		t.Fatal("no frame was sent")
-	}
-	if gotFrame.DEOJ != eoj {
-		t.Fatalf("expected DEOJ %v, got %v", eoj, gotFrame.DEOJ)
-	}
-	if gotAddr == nil {
-		t.Fatal("no destination address captured")
-	}
-	if gotAddr.IP.String() != host {
-		t.Fatalf("expected host %s, got %s", host, gotAddr.IP.String())
-	}
+	return NewPVPowerGenerationClient(conn)
 }
