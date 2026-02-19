@@ -5,6 +5,7 @@ import "fmt"
 const (
 	ClassPowerDistributionBoardMetering = 0x0287
 	ClassPVPowerGeneration              = 0x0279
+	ClassStorageBattery                 = 0x027D
 )
 
 // EOJ represents an ECHONET Lite object identifier.
