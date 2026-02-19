@@ -61,3 +61,12 @@ Prefix: `echonetlite_power_distribution_board_metering`
 |---|---|---|
 |`<prefix>_electric_energy_simplex_joules_total`|cumulativeElectricEnergyListSimplex|0xB3|
 |`<prefix>_electric_power_simplex_watts`|instantaneousElectricPowerListSimplex|0xB7|
+
+### 蓄電池 (Storage battery)
+
+Prefix: `echonetlite_storage_battery`
+
+|Metric family|ECHONET Lite property (shortName)|EPC|
+|---|---|---|
+|`<prefix>_ac_chargeable_electric_energy_joules`|acChargeableElectricEnergy|0xA4|
+|`<prefix>_ac_dischargeable_electric_energy_joules`|acDischargeableElectricEnergy|0xA5|
