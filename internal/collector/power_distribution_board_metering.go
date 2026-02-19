@@ -7,7 +7,7 @@ import (
 	"sync"
 	"time"
 
-	"github.com/ajalab/echonetlite-exporter/echonetlite"
+	"github.com/ajalab/echonetlite-exporter/internal/echonetlite"
 	"github.com/prometheus/client_golang/prometheus"
 )
 
