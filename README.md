@@ -70,3 +70,5 @@ Prefix: `echonetlite_storage_battery`
 |---|---|---|
 |`<prefix>_ac_chargeable_electric_energy_joules`|acChargeableElectricEnergy|0xA4|
 |`<prefix>_ac_dischargeable_electric_energy_joules`|acDischargeableElectricEnergy|0xA5|
+|`<prefix>_ac_charging_electric_energy_joules_total`|acCumulativeChargingElectricEnergy|0xA8|
+|`<prefix>_ac_discharging_electric_energy_joules_total`|acCumulativeDischargingElectricEnergy|0xA9|

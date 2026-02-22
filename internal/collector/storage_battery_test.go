@@ -22,8 +22,10 @@ func TestStorageBatteryUpdateMetricsUsesDeviceLabels(t *testing.T) {
 	c := NewStorageBatteryCollector(nil, 0, 0, NewCollectMetrics(), nil)
 	device := echonetlite.NewDevice("192.0.2.12", echonetlite.EOJ{0x02, 0x7D, 0x01})
 	sb := &echonetlite.StorageBattery{
-		ACChargeableElectricEnergyWh:    2,
-		ACDischargeableElectricEnergyWh: 3,
+		ACChargeableElectricEnergy:            2,
+		ACDischargeableElectricEnergy:         3,
+		ACCumulativeChargingElectricEnergy:    4,
+		ACCumulativeDischargingElectricEnergy: 5,
 	}
 
 	c.updateMetrics(device, sb)
@@ -39,6 +41,22 @@ func TestStorageBatteryUpdateMetricsUsesDeviceLabels(t *testing.T) {
 	)
 	if gotDischargeable != 10800 {
 		t.Fatalf("expected dischargeable energy 10800, got %v", gotDischargeable)
+	}
+
+	key := cumulativeStorageBatteryEnergyKey{host: device.Host(), eoj: device.EOJ().String()}
+	gotCharging, ok := c.acChargingEnergy[key]
+	if !ok {
+		t.Fatalf("expected cumulative charging energy for key %+v", key)
+	}
+	if gotCharging != 14400 {
+		t.Fatalf("expected cumulative charging energy 14400, got %v", gotCharging)
+	}
+	gotDischarging, ok := c.acDischargingEnergy[key]
+	if !ok {
+		t.Fatalf("expected cumulative discharging energy for key %+v", key)
+	}
+	if gotDischarging != 18000 {
+		t.Fatalf("expected cumulative discharging energy 18000, got %v", gotDischarging)
 	}
 }
 
@@ -64,8 +82,10 @@ func TestStorageBatteryCollectSetsSuccessState(t *testing.T) {
 	c.client = &stubStorageBatteryClient{
 		getFunc: func(ctx context.Context, host string, eoj echonetlite.EOJ) (*echonetlite.StorageBattery, error) {
 			return &echonetlite.StorageBattery{
-				ACChargeableElectricEnergyWh:    1,
-				ACDischargeableElectricEnergyWh: 2,
+				ACChargeableElectricEnergy:            1,
+				ACDischargeableElectricEnergy:         2,
+				ACCumulativeChargingElectricEnergy:    3,
+				ACCumulativeDischargingElectricEnergy: 4,
 			}, nil
 		},
 	}

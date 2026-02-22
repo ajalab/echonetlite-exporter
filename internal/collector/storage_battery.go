@@ -3,6 +3,7 @@ package collector
 import (
 	"context"
 	"log/slog"
+	"sync"
 	"time"
 
 	"github.com/ajalab/echonetlite-exporter/internal/echonetlite"
@@ -21,7 +22,17 @@ type StorageBatteryCollector struct {
 
 	acChargeableEnergyGauge    *prometheus.GaugeVec
 	acDischargeableEnergyGauge *prometheus.GaugeVec
+	acChargingEnergyDesc       *prometheus.Desc
+	acChargingEnergy           map[cumulativeStorageBatteryEnergyKey]float64
+	acDischargingEnergyDesc    *prometheus.Desc
+	acDischargingEnergy        map[cumulativeStorageBatteryEnergyKey]float64
+	metricsStateMu             sync.Mutex
 	collectMetrics             *CollectMetrics
+}
+
+type cumulativeStorageBatteryEnergyKey struct {
+	host string
+	eoj  string
 }
 
 func NewStorageBatteryCollector(
@@ -50,7 +61,21 @@ func NewStorageBatteryCollector(
 			},
 			[]string{"host", "eoj"},
 		),
-		collectMetrics: collectMetrics,
+		acChargingEnergyDesc: prometheus.NewDesc(
+			"echonetlite_storage_battery_ac_charging_electric_energy_joules_total",
+			"Cumulative charging electric energy (AC).",
+			[]string{"host", "eoj"},
+			nil,
+		),
+		acChargingEnergy: make(map[cumulativeStorageBatteryEnergyKey]float64),
+		acDischargingEnergyDesc: prometheus.NewDesc(
+			"echonetlite_storage_battery_ac_discharging_electric_energy_joules_total",
+			"Cumulative discharging electric energy (AC).",
+			[]string{"host", "eoj"},
+			nil,
+		),
+		acDischargingEnergy: make(map[cumulativeStorageBatteryEnergyKey]float64),
+		collectMetrics:      collectMetrics,
 	}
 }
 
@@ -61,11 +86,33 @@ func (c *StorageBatteryCollector) Start(ctx context.Context) {
 func (c *StorageBatteryCollector) Describe(ch chan<- *prometheus.Desc) {
 	c.acChargeableEnergyGauge.Describe(ch)
 	c.acDischargeableEnergyGauge.Describe(ch)
+	ch <- c.acChargingEnergyDesc
+	ch <- c.acDischargingEnergyDesc
 }
 
 func (c *StorageBatteryCollector) Collect(ch chan<- prometheus.Metric) {
 	c.acChargeableEnergyGauge.Collect(ch)
 	c.acDischargeableEnergyGauge.Collect(ch)
+	c.metricsStateMu.Lock()
+	for key, value := range c.acChargingEnergy {
+		ch <- prometheus.MustNewConstMetric(
+			c.acChargingEnergyDesc,
+			prometheus.CounterValue,
+			value,
+			key.host,
+			key.eoj,
+		)
+	}
+	for key, value := range c.acDischargingEnergy {
+		ch <- prometheus.MustNewConstMetric(
+			c.acDischargingEnergyDesc,
+			prometheus.CounterValue,
+			value,
+			key.host,
+			key.eoj,
+		)
+	}
+	c.metricsStateMu.Unlock()
 }
 
 func (c *StorageBatteryCollector) collectLoop(ctx context.Context, targets []echonetlite.Device) {
@@ -105,9 +152,18 @@ func (c *StorageBatteryCollector) updateMetrics(
 	sb *echonetlite.StorageBattery,
 ) {
 	c.acChargeableEnergyGauge.WithLabelValues(device.Host(), device.EOJ().String()).Set(
-		float64(sb.ACChargeableElectricEnergyWh) * 3600.0,
+		float64(sb.ACChargeableElectricEnergy) * 3600.0,
 	)
 	c.acDischargeableEnergyGauge.WithLabelValues(device.Host(), device.EOJ().String()).Set(
-		float64(sb.ACDischargeableElectricEnergyWh) * 3600.0,
+		float64(sb.ACDischargeableElectricEnergy) * 3600.0,
 	)
+
+	key := cumulativeStorageBatteryEnergyKey{
+		host: device.Host(),
+		eoj:  device.EOJ().String(),
+	}
+	c.metricsStateMu.Lock()
+	c.acChargingEnergy[key] = float64(sb.ACCumulativeChargingElectricEnergy) * 3600.0
+	c.acDischargingEnergy[key] = float64(sb.ACCumulativeDischargingElectricEnergy) * 3600.0
+	c.metricsStateMu.Unlock()
 }

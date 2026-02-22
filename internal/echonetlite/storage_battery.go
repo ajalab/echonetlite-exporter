@@ -7,8 +7,10 @@ import (
 )
 
 const (
-	epcACChargeableElectricEnergy    = 0xA4
-	epcACDischargeableElectricEnergy = 0xA5
+	epcACChargeableElectricEnergy            = 0xA4
+	epcACDischargeableElectricEnergy         = 0xA5
+	epcACCumulativeChargingElectricEnergy    = 0xA8
+	epcACCumulativeDischargingElectricEnergy = 0xA9
 )
 
 type StorageBatteryClient struct {
@@ -29,6 +31,8 @@ func (s *StorageBatteryClient) Get(ctx context.Context, host string, eoj EOJ) (*
 		Properties: []Property{
 			{EPC: epcACChargeableElectricEnergy, EDT: []byte{}},
 			{EPC: epcACDischargeableElectricEnergy, EDT: []byte{}},
+			{EPC: epcACCumulativeChargingElectricEnergy, EDT: []byte{}},
+			{EPC: epcACCumulativeDischargingElectricEnergy, EDT: []byte{}},
 		},
 	}
 	resFrame, err := s.conn.Unicast(ctx, host, getReq)
@@ -47,13 +51,25 @@ func (s *StorageBatteryClient) Get(ctx context.Context, host string, eoj EOJ) (*
 			if err != nil {
 				return nil, fmt.Errorf("invalid acChargeableElectricEnergy data: %w", err)
 			}
-			sb.ACChargeableElectricEnergyWh = val
+			sb.ACChargeableElectricEnergy = val
 		case epcACDischargeableElectricEnergy:
 			val, err := parseStorageBatteryWh(prop.EDT)
 			if err != nil {
 				return nil, fmt.Errorf("invalid acDischargeableElectricEnergy data: %w", err)
 			}
-			sb.ACDischargeableElectricEnergyWh = val
+			sb.ACDischargeableElectricEnergy = val
+		case epcACCumulativeChargingElectricEnergy:
+			val, err := parseStorageBatteryWh(prop.EDT)
+			if err != nil {
+				return nil, fmt.Errorf("invalid acCumulativeChargingElectricEnergy data: %w", err)
+			}
+			sb.ACCumulativeChargingElectricEnergy = val
+		case epcACCumulativeDischargingElectricEnergy:
+			val, err := parseStorageBatteryWh(prop.EDT)
+			if err != nil {
+				return nil, fmt.Errorf("invalid acCumulativeDischargingElectricEnergy data: %w", err)
+			}
+			sb.ACCumulativeDischargingElectricEnergy = val
 		default:
 			return nil, fmt.Errorf("unexpected EPC: 0x%X", prop.EPC)
 		}
@@ -65,11 +81,17 @@ func (s *StorageBatteryClient) Get(ctx context.Context, host string, eoj EOJ) (*
 type StorageBattery struct {
 	// This property indicates the electric energy that can be charged at the
 	// present point in time (AC).
-	ACChargeableElectricEnergyWh uint32
+	ACChargeableElectricEnergy uint32
 
 	// This property indicates the electric energy that can be discharged at the
 	// present point in time (AC).
-	ACDischargeableElectricEnergyWh uint32
+	ACDischargeableElectricEnergy uint32
+
+	// This property indicates the cumulative charging electric energy (AC) in 0.001kWh.
+	ACCumulativeChargingElectricEnergy uint32
+
+	// This property indicates the cumulative discharging electric energy (AC) in 0.001kWh.
+	ACCumulativeDischargingElectricEnergy uint32
 }
 
 func parseStorageBatteryWh(edts []byte) (uint32, error) {
