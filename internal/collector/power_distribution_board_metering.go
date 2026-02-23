@@ -14,7 +14,7 @@ import (
 type PowerDistributionBoardMeteringCollector struct {
 	interval time.Duration
 	timeout  time.Duration
-	client   *echonetlite.PowerDistributionBoardMeteringClient
+	get      func(ctx context.Context, host string, eoj echonetlite.EOJ) (*echonetlite.PowerDistributionBoardMetering, error)
 	targets  []echonetlite.Device
 
 	instantaneousElectricPowerSimplexGauge *prometheus.GaugeVec
@@ -37,10 +37,11 @@ func NewPowerDistributionBoardMeteringCollector(
 	collectMetrics *CollectMetrics,
 	targets []echonetlite.Device,
 ) *PowerDistributionBoardMeteringCollector {
+	client := echonetlite.NewPowerDistributionBoardMeteringClient(conn)
 	return &PowerDistributionBoardMeteringCollector{
 		interval: interval,
 		timeout:  timeout,
-		client:   echonetlite.NewPowerDistributionBoardMeteringClient(conn),
+		get:      client.Get,
 		targets:  targets,
 		instantaneousElectricPowerSimplexGauge: prometheus.NewGaugeVec(
 			prometheus.GaugeOpts{
@@ -103,7 +104,7 @@ func (c *PowerDistributionBoardMeteringCollector) collectLoop(ctx context.Contex
 func (c *PowerDistributionBoardMeteringCollector) collect(ctx context.Context, devices []echonetlite.Device) {
 	for _, device := range devices {
 		reqCtx, cancel := context.WithTimeout(ctx, c.timeout)
-		props, err := c.client.Get(reqCtx, device.Host(), device.EOJ())
+		props, err := c.get(reqCtx, device.Host(), device.EOJ())
 		cancel()
 
 		if err != nil {

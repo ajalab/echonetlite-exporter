@@ -1,36 +1,40 @@
 package collector
 
 import (
-	"math"
+	"context"
+	"errors"
 	"testing"
+	"time"
 
 	"github.com/ajalab/echonetlite-exporter/internal/echonetlite"
 	"github.com/prometheus/client_golang/prometheus/testutil"
 )
 
-func TestPDBMUpdateMetricsUsesDeviceLabels(t *testing.T) {
-	c := NewPowerDistributionBoardMeteringCollector(nil, 0, 0, NewCollectMetrics(), nil)
+func TestPowerDistributionBoardMeteringCollectSuccessUpdatesMetricsAndSuccessState(t *testing.T) {
+	collectMetrics := NewCollectMetrics()
 	device := echonetlite.NewDevice("192.0.2.11", echonetlite.EOJ{0x02, 0x87, 0x01})
-	pdbm := &echonetlite.PowerDistributionBoardMetering{
-		InstantaneousElectricPowerListSimplex: echonetlite.InstantaneousElectricPowerListSimplex{
-			StartChannel:               3,
-			InstantaneousElectricPower: []int32{100},
-		},
-		CumulativeElectricEnergyListSimplex: echonetlite.CumulativeElectricEnergyListSimplex{
-			StartChannel:   3,
-			ElectricEnergy: []int32{2},
-		},
-		UnitForCumulativeEnergy: 0.1, // 0.2kWh
-	}
+	c := NewPowerDistributionBoardMeteringCollector(nil, time.Second, time.Second, collectMetrics, []echonetlite.Device{device})
 
-	c.updateMetrics(device, pdbm)
+	c.get = func(ctx context.Context, host string, eoj echonetlite.EOJ) (*echonetlite.PowerDistributionBoardMetering, error) {
+		return &echonetlite.PowerDistributionBoardMetering{
+			InstantaneousElectricPowerListSimplex: echonetlite.InstantaneousElectricPowerListSimplex{
+				StartChannel:               3,
+				InstantaneousElectricPower: []int32{100},
+			},
+			CumulativeElectricEnergyListSimplex: echonetlite.CumulativeElectricEnergyListSimplex{
+				StartChannel:   3,
+				ElectricEnergy: []int32{2},
+			},
+			UnitForCumulativeEnergy: 0.1, // 0.2kWh
+		}, nil
+	}
+	c.collect(context.Background(), []echonetlite.Device{device})
+	assertCollectSuccess(t, collectMetrics, device, 1)
 
 	gotGauge := testutil.ToFloat64(
 		c.instantaneousElectricPowerSimplexGauge.WithLabelValues(device.Host(), device.EOJ().String(), "3"),
 	)
-	if gotGauge != 100 {
-		t.Fatalf("expected instantaneous gauge 100, got %v", gotGauge)
-	}
+	assertFloatEqual(t, gotGauge, 100)
 
 	key := cumulativeElectricEnergyKey{
 		host:    device.Host(),
@@ -41,7 +45,17 @@ func TestPDBMUpdateMetricsUsesDeviceLabels(t *testing.T) {
 	if !ok {
 		t.Fatalf("expected cumulative energy for key %+v", key)
 	}
-	if math.Abs(gotCounter-720000) > 0.1 {
-		t.Fatalf("expected cumulative energy about 720000, got %v", gotCounter)
+	assertFloatApprox(t, gotCounter, 720000, 0.1)
+}
+
+func TestPowerDistributionBoardMeteringCollectFailureSetsSuccessState(t *testing.T) {
+	collectMetrics := NewCollectMetrics()
+	device := echonetlite.NewDevice("192.0.2.11", echonetlite.EOJ{0x02, 0x87, 0x01})
+	c := NewPowerDistributionBoardMeteringCollector(nil, time.Second, time.Second, collectMetrics, []echonetlite.Device{device})
+
+	c.get = func(ctx context.Context, host string, eoj echonetlite.EOJ) (*echonetlite.PowerDistributionBoardMetering, error) {
+		return nil, errors.New("test error")
 	}
+	c.collect(context.Background(), []echonetlite.Device{device})
+	assertCollectSuccess(t, collectMetrics, device, 0)
 }

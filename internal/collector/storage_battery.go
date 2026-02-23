@@ -10,14 +10,10 @@ import (
 	"github.com/prometheus/client_golang/prometheus"
 )
 
-type storageBatteryGetter interface {
-	Get(ctx context.Context, host string, eoj echonetlite.EOJ) (*echonetlite.StorageBattery, error)
-}
-
 type StorageBatteryCollector struct {
 	interval time.Duration
 	timeout  time.Duration
-	client   storageBatteryGetter
+	get      func(ctx context.Context, host string, eoj echonetlite.EOJ) (*echonetlite.StorageBattery, error)
 	targets  []echonetlite.Device
 
 	acChargeableEnergyGauge    *prometheus.GaugeVec
@@ -42,10 +38,11 @@ func NewStorageBatteryCollector(
 	collectMetrics *CollectMetrics,
 	targets []echonetlite.Device,
 ) *StorageBatteryCollector {
+	client := echonetlite.NewStorageBatteryClient(conn)
 	return &StorageBatteryCollector{
 		interval: interval,
 		timeout:  timeout,
-		client:   echonetlite.NewStorageBatteryClient(conn),
+		get:      client.Get,
 		targets:  targets,
 		acChargeableEnergyGauge: prometheus.NewGaugeVec(
 			prometheus.GaugeOpts{
@@ -133,7 +130,7 @@ func (c *StorageBatteryCollector) collectLoop(ctx context.Context, targets []ech
 func (c *StorageBatteryCollector) collect(ctx context.Context, devices []echonetlite.Device) {
 	for _, device := range devices {
 		reqCtx, cancel := context.WithTimeout(ctx, c.timeout)
-		props, err := c.client.Get(reqCtx, device.Host(), device.EOJ())
+		props, err := c.get(reqCtx, device.Host(), device.EOJ())
 		cancel()
 
 		if err != nil {

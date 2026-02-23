@@ -10,14 +10,10 @@ import (
 	"github.com/prometheus/client_golang/prometheus"
 )
 
-type multipleInputPCSGetter interface {
-	Get(ctx context.Context, host string, eoj echonetlite.EOJ) (*echonetlite.MultipleInputPCS, error)
-}
-
 type MultipleInputPCSCollector struct {
 	interval time.Duration
 	timeout  time.Duration
-	client   multipleInputPCSGetter
+	get      func(ctx context.Context, host string, eoj echonetlite.EOJ) (*echonetlite.MultipleInputPCS, error)
 	targets  []echonetlite.Device
 
 	instantaneousElectricPowerGauge *prometheus.GaugeVec
@@ -41,18 +37,19 @@ func NewMultipleInputPCSCollector(
 	collectMetrics *CollectMetrics,
 	targets []echonetlite.Device,
 ) *MultipleInputPCSCollector {
+	client := echonetlite.NewMultipleInputPCSClient(conn)
 	return &MultipleInputPCSCollector{
 		interval: interval,
 		timeout:  timeout,
-			client:   echonetlite.NewMultipleInputPCSClient(conn),
-			targets:  targets,
-			instantaneousElectricPowerGauge: prometheus.NewGaugeVec(
-				prometheus.GaugeOpts{
-					Name: "echonetlite_multiple_input_pcs_electric_power_watts",
-					Help: "Measured instantaneous electric power.",
-				},
-				[]string{"host", "eoj"},
-			),
+		get:      client.Get,
+		targets:  targets,
+		instantaneousElectricPowerGauge: prometheus.NewGaugeVec(
+			prometheus.GaugeOpts{
+				Name: "echonetlite_multiple_input_pcs_electric_power_watts",
+				Help: "Measured instantaneous electric power.",
+			},
+			[]string{"host", "eoj"},
+		),
 		normalDirectionEnergyDesc: prometheus.NewDesc(
 			"echonetlite_multiple_input_pcs_normal_direction_electric_energy_joules_total",
 			"Cumulative electric energy in the normal direction.",
@@ -123,7 +120,7 @@ func (c *MultipleInputPCSCollector) collectLoop(ctx context.Context, targets []e
 func (c *MultipleInputPCSCollector) collect(ctx context.Context, devices []echonetlite.Device) {
 	for _, device := range devices {
 		reqCtx, cancel := context.WithTimeout(ctx, c.timeout)
-		props, err := c.client.Get(reqCtx, device.Host(), device.EOJ())
+		props, err := c.get(reqCtx, device.Host(), device.EOJ())
 		cancel()
 
 		if err != nil {
