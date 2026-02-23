@@ -6,6 +6,7 @@ const (
 	ClassPowerDistributionBoardMetering = 0x0287
 	ClassPVPowerGeneration              = 0x0279
 	ClassStorageBattery                 = 0x027D
+	ClassMultipleInputPCS               = 0x02A5
 )
 
 // EOJ represents an ECHONET Lite object identifier.
