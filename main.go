@@ -29,9 +29,10 @@ var (
 type Exporter struct {
 	conn *echonetlite.Connection
 
-	pdbmCollector           *collector.PowerDistributionBoardMeteringCollector
-	pvCollector             *collector.PVPowerGenerationCollector
-	storageBatteryCollector *collector.StorageBatteryCollector
+	pdbmCollector             *collector.PowerDistributionBoardMeteringCollector
+	pvCollector               *collector.PVPowerGenerationCollector
+	storageBatteryCollector   *collector.StorageBatteryCollector
+	multipleInputPCSCollector *collector.MultipleInputPCSCollector
 
 	collectMetrics *collector.CollectMetrics
 }
@@ -41,6 +42,7 @@ func NewExporter(
 	pdbmTargets []echonetlite.Device,
 	pvTargets []echonetlite.Device,
 	storageBatteryTargets []echonetlite.Device,
+	multipleInputPCSTargets []echonetlite.Device,
 ) *Exporter {
 	collectMetrics := collector.NewCollectMetrics()
 	pdbmCollector := collector.NewPowerDistributionBoardMeteringCollector(
@@ -64,12 +66,20 @@ func NewExporter(
 		collectMetrics,
 		storageBatteryTargets,
 	)
+	multipleInputPCSCollector := collector.NewMultipleInputPCSCollector(
+		conn,
+		*collectorInterval,
+		*collectorTimeout,
+		collectMetrics,
+		multipleInputPCSTargets,
+	)
 	exporter := &Exporter{
-		conn:                    conn,
-		pdbmCollector:           pdbmCollector,
-		pvCollector:             pvCollector,
-		storageBatteryCollector: storageBatteryCollector,
-		collectMetrics:          collectMetrics,
+		conn:                      conn,
+		pdbmCollector:             pdbmCollector,
+		pvCollector:               pvCollector,
+		storageBatteryCollector:   storageBatteryCollector,
+		multipleInputPCSCollector: multipleInputPCSCollector,
+		collectMetrics:            collectMetrics,
 	}
 
 	return exporter
@@ -81,6 +91,7 @@ func (e *Exporter) RegisterMetrics() {
 		e.pdbmCollector,
 		e.pvCollector,
 		e.storageBatteryCollector,
+		e.multipleInputPCSCollector,
 	)
 }
 
@@ -88,12 +99,13 @@ func (e *Exporter) Start(ctx context.Context) {
 	e.pdbmCollector.Start(ctx)
 	e.pvCollector.Start(ctx)
 	e.storageBatteryCollector.Start(ctx)
+	e.multipleInputPCSCollector.Start(ctx)
 }
 
 func scanTargets(
 	ctx context.Context,
 	conn *echonetlite.Connection,
-) ([]echonetlite.Device, []echonetlite.Device, []echonetlite.Device, error) {
+) ([]echonetlite.Device, []echonetlite.Device, []echonetlite.Device, []echonetlite.Device, error) {
 	reqCtx, cancel := context.WithTimeout(ctx, *discoveryScanDuration)
 	defer cancel()
 
@@ -102,13 +114,14 @@ func scanTargets(
 	slog.Info("scanning ECHONET Lite nodes")
 	nodes, err := nodeProfileClient.Scan(reqCtx)
 	if err != nil {
-		return nil, nil, nil, err
+		return nil, nil, nil, nil, err
 	}
 	slog.Info(fmt.Sprintf("scanned %d ECHONET Lite nodes", len(nodes)))
 
 	var pdbms []echonetlite.Device
 	var pvpgs []echonetlite.Device
 	var sbs []echonetlite.Device
+	var mipcss []echonetlite.Device
 	for _, node := range nodes {
 		nodeProfile := node.NodeProfile
 		for _, eoj := range nodeProfile.SelfNodeInstanceListS {
@@ -120,11 +133,13 @@ func scanTargets(
 				pvpgs = append(pvpgs, echonetlite.NewDevice(node.Host, eoj))
 			case echonetlite.ClassStorageBattery:
 				sbs = append(sbs, echonetlite.NewDevice(node.Host, eoj))
+			case echonetlite.ClassMultipleInputPCS:
+				mipcss = append(mipcss, echonetlite.NewDevice(node.Host, eoj))
 			}
 		}
 	}
 
-	return pdbms, pvpgs, sbs, nil
+	return pdbms, pvpgs, sbs, mipcss, nil
 }
 
 func main() {
@@ -149,12 +164,12 @@ func main() {
 	}
 	defer conn.Close()
 
-	pdbms, pvs, sbs, err := scanTargets(ctx, conn)
+	pdbms, pvs, sbs, mipcss, err := scanTargets(ctx, conn)
 	if err != nil {
 		log.Fatalf("startup failed: failed to scan nodes: %v", err)
 	}
 
-	exporter := NewExporter(conn, pdbms, pvs, sbs)
+	exporter := NewExporter(conn, pdbms, pvs, sbs, mipcss)
 	exporter.RegisterMetrics()
 	exporter.Start(ctx)
 

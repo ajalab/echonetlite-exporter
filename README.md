@@ -72,3 +72,13 @@ Prefix: `echonetlite_storage_battery`
 |`<prefix>_ac_dischargeable_electric_energy_joules`|acDischargeableElectricEnergy|0xA5|
 |`<prefix>_ac_charging_electric_energy_joules_total`|acCumulativeChargingElectricEnergy|0xA8|
 |`<prefix>_ac_discharging_electric_energy_joules_total`|acCumulativeDischargingElectricEnergy|0xA9|
+
+### マルチ入力PCS (Multiple input PCS)
+
+Prefix: `echonetlite_multiple_input_pcs`
+
+|Metric family|ECHONET Lite property (shortName)|EPC|
+|---|---|---|
+|`<prefix>_normal_direction_electric_energy_joules_total`|normalDirectionElectricEnergy|0xE0|
+|`<prefix>_reverse_direction_electric_energy_joules_total`|reverseDirectionElectricEnergy|0xE3|
+|`<prefix>_electric_power_watts`|instantaneousElectricPower|0xE7|
