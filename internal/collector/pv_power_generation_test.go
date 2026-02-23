@@ -1,35 +1,50 @@
 package collector
 
 import (
+	"context"
+	"errors"
 	"testing"
+	"time"
 
 	"github.com/ajalab/echonetlite-exporter/internal/echonetlite"
 	"github.com/prometheus/client_golang/prometheus/testutil"
 )
 
-func TestPVUpdateMetricsUsesDeviceLabels(t *testing.T) {
-	c := NewPVPowerGenerationCollector(nil, 0, 0, NewCollectMetrics(), nil)
+func TestPVPowerGenerationCollectSuccessUpdatesMetricsAndSuccessState(t *testing.T) {
+	collectMetrics := NewCollectMetrics()
 	device := echonetlite.NewDevice("192.0.2.10", echonetlite.EOJ{0x02, 0x79, 0x01})
-	pvpg := &echonetlite.PVPowerGeneration{
-		InstantaneousElectricPowerGeneration: 321,
-		CumulativeElectricEnergyOfGeneration: 2000, // 2kWh
-	}
+	c := NewPVPowerGenerationCollector(nil, time.Second, time.Second, collectMetrics, []echonetlite.Device{device})
 
-	c.updateMetrics(device, pvpg)
+	c.get = func(ctx context.Context, host string, eoj echonetlite.EOJ) (*echonetlite.PVPowerGeneration, error) {
+		return &echonetlite.PVPowerGeneration{
+			InstantaneousElectricPowerGeneration: 321,
+			CumulativeElectricEnergyOfGeneration: 2000, // 2kWh
+		}, nil
+	}
+	c.collect(context.Background(), []echonetlite.Device{device})
+	assertCollectSuccess(t, collectMetrics, device, 1)
 
 	gotGauge := testutil.ToFloat64(
 		c.instantaneousPowerGauge.WithLabelValues(device.Host(), device.EOJ().String()),
 	)
-	if gotGauge != 321 {
-		t.Fatalf("expected instantaneous gauge 321, got %v", gotGauge)
-	}
+	assertFloatEqual(t, gotGauge, 321)
 
 	key := cumulativeEnergyKey{host: device.Host(), eoj: device.EOJ().String()}
 	gotCounter, ok := c.cumulativeEnergy[key]
 	if !ok {
 		t.Fatalf("expected cumulative energy for key %+v", key)
 	}
-	if gotCounter != 7200000 {
-		t.Fatalf("expected cumulative energy 7200000, got %v", gotCounter)
+	assertFloatEqual(t, gotCounter, 7200000)
+}
+
+func TestPVPowerGenerationCollectFailureSetsSuccessState(t *testing.T) {
+	collectMetrics := NewCollectMetrics()
+	device := echonetlite.NewDevice("192.0.2.10", echonetlite.EOJ{0x02, 0x79, 0x01})
+	c := NewPVPowerGenerationCollector(nil, time.Second, time.Second, collectMetrics, []echonetlite.Device{device})
+
+	c.get = func(ctx context.Context, host string, eoj echonetlite.EOJ) (*echonetlite.PVPowerGeneration, error) {
+		return nil, errors.New("test error")
 	}
+	c.collect(context.Background(), []echonetlite.Device{device})
+	assertCollectSuccess(t, collectMetrics, device, 0)
 }

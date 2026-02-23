@@ -13,7 +13,7 @@ import (
 type PVPowerGenerationCollector struct {
 	interval time.Duration
 	timeout  time.Duration
-	client   *echonetlite.PVPowerGenerationClient
+	get      func(ctx context.Context, host string, eoj echonetlite.EOJ) (*echonetlite.PVPowerGeneration, error)
 	targets  []echonetlite.Device
 
 	instantaneousPowerGauge *prometheus.GaugeVec
@@ -35,10 +35,11 @@ func NewPVPowerGenerationCollector(
 	collectMetrics *CollectMetrics,
 	targets []echonetlite.Device,
 ) *PVPowerGenerationCollector {
+	client := echonetlite.NewPVPowerGenerationClient(conn)
 	return &PVPowerGenerationCollector{
 		interval: interval,
 		timeout:  timeout,
-		client:   echonetlite.NewPVPowerGenerationClient(conn),
+		get:      client.Get,
 		targets:  targets,
 		instantaneousPowerGauge: prometheus.NewGaugeVec(
 			prometheus.GaugeOpts{
@@ -100,7 +101,7 @@ func (c *PVPowerGenerationCollector) collectLoop(ctx context.Context, targets []
 func (c *PVPowerGenerationCollector) collect(ctx context.Context, devices []echonetlite.Device) {
 	for _, device := range devices {
 		reqCtx, cancel := context.WithTimeout(ctx, c.timeout)
-		props, err := c.client.Get(reqCtx, device.Host(), device.EOJ())
+		props, err := c.get(reqCtx, device.Host(), device.EOJ())
 		cancel()
 
 		if err != nil {

@@ -10,91 +10,52 @@ import (
 	"github.com/prometheus/client_golang/prometheus/testutil"
 )
 
-type stubStorageBatteryClient struct {
-	getFunc func(ctx context.Context, host string, eoj echonetlite.EOJ) (*echonetlite.StorageBattery, error)
-}
-
-func (s *stubStorageBatteryClient) Get(ctx context.Context, host string, eoj echonetlite.EOJ) (*echonetlite.StorageBattery, error) {
-	return s.getFunc(ctx, host, eoj)
-}
-
-func TestStorageBatteryUpdateMetricsUsesDeviceLabels(t *testing.T) {
-	c := NewStorageBatteryCollector(nil, 0, 0, NewCollectMetrics(), nil)
+func TestStorageBatteryCollectSuccessUpdatesMetricsAndSuccessState(t *testing.T) {
+	collectMetrics := NewCollectMetrics()
 	device := echonetlite.NewDevice("192.0.2.12", echonetlite.EOJ{0x02, 0x7D, 0x01})
-	sb := &echonetlite.StorageBattery{
-		ACChargeableElectricEnergy:            2,
-		ACDischargeableElectricEnergy:         3,
-		ACCumulativeChargingElectricEnergy:    4,
-		ACCumulativeDischargingElectricEnergy: 5,
-	}
+	c := NewStorageBatteryCollector(nil, time.Second, time.Second, collectMetrics, []echonetlite.Device{device})
 
-	c.updateMetrics(device, sb)
+	c.get = func(ctx context.Context, host string, eoj echonetlite.EOJ) (*echonetlite.StorageBattery, error) {
+		return &echonetlite.StorageBattery{
+			ACChargeableElectricEnergy:            2,
+			ACDischargeableElectricEnergy:         3,
+			ACCumulativeChargingElectricEnergy:    4,
+			ACCumulativeDischargingElectricEnergy: 5,
+		}, nil
+	}
+	c.collect(context.Background(), []echonetlite.Device{device})
+	assertCollectSuccess(t, collectMetrics, device, 1)
 
 	gotChargeable := testutil.ToFloat64(
 		c.acChargeableEnergyGauge.WithLabelValues(device.Host(), device.EOJ().String()),
 	)
-	if gotChargeable != 7200 {
-		t.Fatalf("expected chargeable energy 7200, got %v", gotChargeable)
-	}
+	assertFloatEqual(t, gotChargeable, 7200)
 	gotDischargeable := testutil.ToFloat64(
 		c.acDischargeableEnergyGauge.WithLabelValues(device.Host(), device.EOJ().String()),
 	)
-	if gotDischargeable != 10800 {
-		t.Fatalf("expected dischargeable energy 10800, got %v", gotDischargeable)
-	}
+	assertFloatEqual(t, gotDischargeable, 10800)
 
 	key := cumulativeStorageBatteryEnergyKey{host: device.Host(), eoj: device.EOJ().String()}
 	gotCharging, ok := c.acChargingEnergy[key]
 	if !ok {
 		t.Fatalf("expected cumulative charging energy for key %+v", key)
 	}
-	if gotCharging != 14400 {
-		t.Fatalf("expected cumulative charging energy 14400, got %v", gotCharging)
-	}
+	assertFloatEqual(t, gotCharging, 14400)
 	gotDischarging, ok := c.acDischargingEnergy[key]
 	if !ok {
 		t.Fatalf("expected cumulative discharging energy for key %+v", key)
 	}
-	if gotDischarging != 18000 {
-		t.Fatalf("expected cumulative discharging energy 18000, got %v", gotDischarging)
-	}
+	assertFloatEqual(t, gotDischarging, 18000)
 }
 
-func TestStorageBatteryCollectSetsSuccessState(t *testing.T) {
+func TestStorageBatteryCollectFailureSetsSuccessState(t *testing.T) {
 	collectMetrics := NewCollectMetrics()
 	device := echonetlite.NewDevice("192.0.2.12", echonetlite.EOJ{0x02, 0x7D, 0x01})
 	c := NewStorageBatteryCollector(nil, time.Second, time.Second, collectMetrics, []echonetlite.Device{device})
 
-	c.client = &stubStorageBatteryClient{
-		getFunc: func(ctx context.Context, host string, eoj echonetlite.EOJ) (*echonetlite.StorageBattery, error) {
-			return nil, errors.New("test error")
-		},
+	c.get = func(ctx context.Context, host string, eoj echonetlite.EOJ) (*echonetlite.StorageBattery, error) {
+		return nil, errors.New("test error")
 	}
-
 	c.collect(context.Background(), []echonetlite.Device{device})
-	gotFail := testutil.ToFloat64(
-		collectMetrics.successGauge.WithLabelValues(device.Host(), device.EOJ().String()),
-	)
-	if gotFail != 0 {
-		t.Fatalf("expected success gauge 0 after failure, got %v", gotFail)
-	}
-
-	c.client = &stubStorageBatteryClient{
-		getFunc: func(ctx context.Context, host string, eoj echonetlite.EOJ) (*echonetlite.StorageBattery, error) {
-			return &echonetlite.StorageBattery{
-				ACChargeableElectricEnergy:            1,
-				ACDischargeableElectricEnergy:         2,
-				ACCumulativeChargingElectricEnergy:    3,
-				ACCumulativeDischargingElectricEnergy: 4,
-			}, nil
-		},
-	}
-
-	c.collect(context.Background(), []echonetlite.Device{device})
-	gotSuccess := testutil.ToFloat64(
-		collectMetrics.successGauge.WithLabelValues(device.Host(), device.EOJ().String()),
-	)
-	if gotSuccess != 1 {
-		t.Fatalf("expected success gauge 1 after success, got %v", gotSuccess)
-	}
+	assertCollectSuccess(t, collectMetrics, device, 0)
 }
