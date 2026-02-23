@@ -1,0 +1,4 @@
+interface:
+  display_name: "ECHONET Lite MRA Query"
+  short_description: "Query ECHONET Lite MRA by EOJ or shortName."
+  default_prompt: "Query ECHONET Lite MRA in MRA_v1.3.1 for supported properties or a property definition."
