@@ -19,17 +19,16 @@ Examples:
 
 ### Device properties/result types
 
-- Use `<DeviceClassName>` for the parsed result struct returned by `Get`.
-- Struct fields should use clear property names aligned to ECHONET Lite property semantics.
-- Parse helper names should use `parse<PropertyName>` and parse exactly one property.
-
-Examples:
-
-- `PVPowerGeneration`
-- `PowerDistributionBoardMetering`
-- `StorageBattery`
-- `parseInstantaneousElectricPowerGeneration`
-- `parseCumulativeElectricEnergyOfGeneration`
+- Use `<DeviceClassName>` for the parsed result struct returned by `Get`. Examples:
+    - `PVPowerGeneration`
+    - `PowerDistributionBoardMetering`
+    - `StorageBattery`
+- Struct fields must use the same property names as ECHONET Lite properties. Examples:
+    - `InstantaneousElectricPowerGeneration`
+    - `CumulativeElectricEnergyOfGeneration`
+- Parse helper names should use `parse<PropertyName>` and parse exactly one property. Examples:
+    - `parseInstantaneousElectricPowerGeneration`
+    - `parseCumulativeElectricEnergyOfGeneration`
 
 ## Fail-Fast Rule for Property Retrieval
 
