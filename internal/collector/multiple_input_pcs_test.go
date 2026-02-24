@@ -10,18 +10,32 @@ import (
 	"github.com/prometheus/client_golang/prometheus/testutil"
 )
 
+type fakeMultipleInputPCSClient struct {
+	getFn func(ctx context.Context, host string, eoj echonetlite.EOJ) (*echonetlite.MultipleInputPCS, error)
+}
+
+func (f fakeMultipleInputPCSClient) Get(ctx context.Context, host string, eoj echonetlite.EOJ) (*echonetlite.MultipleInputPCS, error) {
+	return f.getFn(ctx, host, eoj)
+}
+
 func TestMultipleInputPCSCollectSuccessUpdatesMetricsAndSuccessState(t *testing.T) {
 	collectMetrics := NewCollectMetrics()
 	device := echonetlite.NewDevice("192.0.2.20", echonetlite.EOJ{0x02, 0xA5, 0x01})
-	c := NewMultipleInputPCSCollector(nil, time.Second, time.Second, collectMetrics, []echonetlite.Device{device})
-
-	c.get = func(ctx context.Context, host string, eoj echonetlite.EOJ) (*echonetlite.MultipleInputPCS, error) {
-		return &echonetlite.MultipleInputPCS{
-			NormalDirectionElectricEnergy:  2,
-			ReverseDirectionElectricEnergy: 3,
-			InstantaneousElectricPower:     -120,
-		}, nil
-	}
+	c := NewMultipleInputPCSCollector(
+		fakeMultipleInputPCSClient{
+			getFn: func(ctx context.Context, host string, eoj echonetlite.EOJ) (*echonetlite.MultipleInputPCS, error) {
+				return &echonetlite.MultipleInputPCS{
+					NormalDirectionElectricEnergy:  2,
+					ReverseDirectionElectricEnergy: 3,
+					InstantaneousElectricPower:     -120,
+				}, nil
+			},
+		},
+		time.Second,
+		time.Second,
+		collectMetrics,
+		[]echonetlite.Device{device},
+	)
 	c.collect(context.Background(), []echonetlite.Device{device})
 	assertCollectSuccess(t, collectMetrics, device, 1)
 
@@ -46,11 +60,17 @@ func TestMultipleInputPCSCollectSuccessUpdatesMetricsAndSuccessState(t *testing.
 func TestMultipleInputPCSCollectFailureSetsSuccessState(t *testing.T) {
 	collectMetrics := NewCollectMetrics()
 	device := echonetlite.NewDevice("192.0.2.20", echonetlite.EOJ{0x02, 0xA5, 0x01})
-	c := NewMultipleInputPCSCollector(nil, time.Second, time.Second, collectMetrics, []echonetlite.Device{device})
-
-	c.get = func(ctx context.Context, host string, eoj echonetlite.EOJ) (*echonetlite.MultipleInputPCS, error) {
-		return nil, errors.New("test error")
-	}
+	c := NewMultipleInputPCSCollector(
+		fakeMultipleInputPCSClient{
+			getFn: func(ctx context.Context, host string, eoj echonetlite.EOJ) (*echonetlite.MultipleInputPCS, error) {
+				return nil, errors.New("test error")
+			},
+		},
+		time.Second,
+		time.Second,
+		collectMetrics,
+		[]echonetlite.Device{device},
+	)
 	c.collect(context.Background(), []echonetlite.Device{device})
 	assertCollectSuccess(t, collectMetrics, device, 0)
 }

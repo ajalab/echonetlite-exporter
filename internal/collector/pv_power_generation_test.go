@@ -10,17 +10,31 @@ import (
 	"github.com/prometheus/client_golang/prometheus/testutil"
 )
 
+type fakePVPowerGenerationClient struct {
+	getFn func(ctx context.Context, host string, eoj echonetlite.EOJ) (*echonetlite.PVPowerGeneration, error)
+}
+
+func (f fakePVPowerGenerationClient) Get(ctx context.Context, host string, eoj echonetlite.EOJ) (*echonetlite.PVPowerGeneration, error) {
+	return f.getFn(ctx, host, eoj)
+}
+
 func TestPVPowerGenerationCollectSuccessUpdatesMetricsAndSuccessState(t *testing.T) {
 	collectMetrics := NewCollectMetrics()
 	device := echonetlite.NewDevice("192.0.2.10", echonetlite.EOJ{0x02, 0x79, 0x01})
-	c := NewPVPowerGenerationCollector(nil, time.Second, time.Second, collectMetrics, []echonetlite.Device{device})
-
-	c.get = func(ctx context.Context, host string, eoj echonetlite.EOJ) (*echonetlite.PVPowerGeneration, error) {
-		return &echonetlite.PVPowerGeneration{
-			InstantaneousElectricPowerGeneration: 321,
-			CumulativeElectricEnergyOfGeneration: 2000, // 2kWh
-		}, nil
-	}
+	c := NewPVPowerGenerationCollector(
+		fakePVPowerGenerationClient{
+			getFn: func(ctx context.Context, host string, eoj echonetlite.EOJ) (*echonetlite.PVPowerGeneration, error) {
+				return &echonetlite.PVPowerGeneration{
+					InstantaneousElectricPowerGeneration: 321,
+					CumulativeElectricEnergyOfGeneration: 2000, // 2kWh
+				}, nil
+			},
+		},
+		time.Second,
+		time.Second,
+		collectMetrics,
+		[]echonetlite.Device{device},
+	)
 	c.collect(context.Background(), []echonetlite.Device{device})
 	assertCollectSuccess(t, collectMetrics, device, 1)
 
@@ -40,11 +54,17 @@ func TestPVPowerGenerationCollectSuccessUpdatesMetricsAndSuccessState(t *testing
 func TestPVPowerGenerationCollectFailureSetsSuccessState(t *testing.T) {
 	collectMetrics := NewCollectMetrics()
 	device := echonetlite.NewDevice("192.0.2.10", echonetlite.EOJ{0x02, 0x79, 0x01})
-	c := NewPVPowerGenerationCollector(nil, time.Second, time.Second, collectMetrics, []echonetlite.Device{device})
-
-	c.get = func(ctx context.Context, host string, eoj echonetlite.EOJ) (*echonetlite.PVPowerGeneration, error) {
-		return nil, errors.New("test error")
-	}
+	c := NewPVPowerGenerationCollector(
+		fakePVPowerGenerationClient{
+			getFn: func(ctx context.Context, host string, eoj echonetlite.EOJ) (*echonetlite.PVPowerGeneration, error) {
+				return nil, errors.New("test error")
+			},
+		},
+		time.Second,
+		time.Second,
+		collectMetrics,
+		[]echonetlite.Device{device},
+	)
 	c.collect(context.Background(), []echonetlite.Device{device})
 	assertCollectSuccess(t, collectMetrics, device, 0)
 }

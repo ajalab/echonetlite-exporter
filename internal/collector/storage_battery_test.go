@@ -10,19 +10,33 @@ import (
 	"github.com/prometheus/client_golang/prometheus/testutil"
 )
 
+type fakeStorageBatteryClient struct {
+	getFn func(ctx context.Context, host string, eoj echonetlite.EOJ) (*echonetlite.StorageBattery, error)
+}
+
+func (f fakeStorageBatteryClient) Get(ctx context.Context, host string, eoj echonetlite.EOJ) (*echonetlite.StorageBattery, error) {
+	return f.getFn(ctx, host, eoj)
+}
+
 func TestStorageBatteryCollectSuccessUpdatesMetricsAndSuccessState(t *testing.T) {
 	collectMetrics := NewCollectMetrics()
 	device := echonetlite.NewDevice("192.0.2.12", echonetlite.EOJ{0x02, 0x7D, 0x01})
-	c := NewStorageBatteryCollector(nil, time.Second, time.Second, collectMetrics, []echonetlite.Device{device})
-
-	c.get = func(ctx context.Context, host string, eoj echonetlite.EOJ) (*echonetlite.StorageBattery, error) {
-		return &echonetlite.StorageBattery{
-			ACChargeableElectricEnergy:            2,
-			ACDischargeableElectricEnergy:         3,
-			ACCumulativeChargingElectricEnergy:    4,
-			ACCumulativeDischargingElectricEnergy: 5,
-		}, nil
-	}
+	c := NewStorageBatteryCollector(
+		fakeStorageBatteryClient{
+			getFn: func(ctx context.Context, host string, eoj echonetlite.EOJ) (*echonetlite.StorageBattery, error) {
+				return &echonetlite.StorageBattery{
+					ACChargeableElectricEnergy:            2,
+					ACDischargeableElectricEnergy:         3,
+					ACCumulativeChargingElectricEnergy:    4,
+					ACCumulativeDischargingElectricEnergy: 5,
+				}, nil
+			},
+		},
+		time.Second,
+		time.Second,
+		collectMetrics,
+		[]echonetlite.Device{device},
+	)
 	c.collect(context.Background(), []echonetlite.Device{device})
 	assertCollectSuccess(t, collectMetrics, device, 1)
 
@@ -51,11 +65,17 @@ func TestStorageBatteryCollectSuccessUpdatesMetricsAndSuccessState(t *testing.T)
 func TestStorageBatteryCollectFailureSetsSuccessState(t *testing.T) {
 	collectMetrics := NewCollectMetrics()
 	device := echonetlite.NewDevice("192.0.2.12", echonetlite.EOJ{0x02, 0x7D, 0x01})
-	c := NewStorageBatteryCollector(nil, time.Second, time.Second, collectMetrics, []echonetlite.Device{device})
-
-	c.get = func(ctx context.Context, host string, eoj echonetlite.EOJ) (*echonetlite.StorageBattery, error) {
-		return nil, errors.New("test error")
-	}
+	c := NewStorageBatteryCollector(
+		fakeStorageBatteryClient{
+			getFn: func(ctx context.Context, host string, eoj echonetlite.EOJ) (*echonetlite.StorageBattery, error) {
+				return nil, errors.New("test error")
+			},
+		},
+		time.Second,
+		time.Second,
+		collectMetrics,
+		[]echonetlite.Device{device},
+	)
 	c.collect(context.Background(), []echonetlite.Device{device})
 	assertCollectSuccess(t, collectMetrics, device, 0)
 }
