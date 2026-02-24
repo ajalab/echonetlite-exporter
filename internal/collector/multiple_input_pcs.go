@@ -13,7 +13,7 @@ import (
 type MultipleInputPCSCollector struct {
 	interval time.Duration
 	timeout  time.Duration
-	get      func(ctx context.Context, host string, eoj echonetlite.EOJ) (*echonetlite.MultipleInputPCS, error)
+	client   multipleInputPCSClient
 	targets  []echonetlite.Device
 
 	instantaneousElectricPowerGauge *prometheus.GaugeVec
@@ -25,23 +25,26 @@ type MultipleInputPCSCollector struct {
 	collectMetrics                  *CollectMetrics
 }
 
+type multipleInputPCSClient interface {
+	Get(ctx context.Context, host string, eoj echonetlite.EOJ) (*echonetlite.MultipleInputPCS, error)
+}
+
 type cumulativeMultipleInputPCSEnergyKey struct {
 	host string
 	eoj  string
 }
 
 func NewMultipleInputPCSCollector(
-	conn *echonetlite.Connection,
+	client multipleInputPCSClient,
 	interval time.Duration,
 	timeout time.Duration,
 	collectMetrics *CollectMetrics,
 	targets []echonetlite.Device,
 ) *MultipleInputPCSCollector {
-	client := echonetlite.NewMultipleInputPCSClient(conn)
 	return &MultipleInputPCSCollector{
 		interval: interval,
 		timeout:  timeout,
-		get:      client.Get,
+		client:   client,
 		targets:  targets,
 		instantaneousElectricPowerGauge: prometheus.NewGaugeVec(
 			prometheus.GaugeOpts{
@@ -120,7 +123,7 @@ func (c *MultipleInputPCSCollector) collectLoop(ctx context.Context, targets []e
 func (c *MultipleInputPCSCollector) collect(ctx context.Context, devices []echonetlite.Device) {
 	for _, device := range devices {
 		reqCtx, cancel := context.WithTimeout(ctx, c.timeout)
-		props, err := c.get(reqCtx, device.Host(), device.EOJ())
+		props, err := c.client.Get(reqCtx, device.Host(), device.EOJ())
 		cancel()
 
 		if err != nil {

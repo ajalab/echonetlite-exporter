@@ -45,29 +45,33 @@ func NewExporter(
 	multipleInputPCSTargets []echonetlite.Device,
 ) *Exporter {
 	collectMetrics := collector.NewCollectMetrics()
+	pdbmClient := echonetlite.NewPowerDistributionBoardMeteringClient(conn)
+	pvClient := echonetlite.NewPVPowerGenerationClient(conn)
+	storageBatteryClient := echonetlite.NewStorageBatteryClient(conn)
+	multipleInputPCSClient := echonetlite.NewMultipleInputPCSClient(conn)
 	pdbmCollector := collector.NewPowerDistributionBoardMeteringCollector(
-		conn,
+		pdbmClient,
 		*collectorInterval,
 		*collectorTimeout,
 		collectMetrics,
 		pdbmTargets,
 	)
 	pvCollector := collector.NewPVPowerGenerationCollector(
-		conn,
+		pvClient,
 		*collectorInterval,
 		*collectorTimeout,
 		collectMetrics,
 		pvTargets,
 	)
 	storageBatteryCollector := collector.NewStorageBatteryCollector(
-		conn,
+		storageBatteryClient,
 		*collectorInterval,
 		*collectorTimeout,
 		collectMetrics,
 		storageBatteryTargets,
 	)
 	multipleInputPCSCollector := collector.NewMultipleInputPCSCollector(
-		conn,
+		multipleInputPCSClient,
 		*collectorInterval,
 		*collectorTimeout,
 		collectMetrics,

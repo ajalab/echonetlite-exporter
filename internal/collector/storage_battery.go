@@ -13,7 +13,7 @@ import (
 type StorageBatteryCollector struct {
 	interval time.Duration
 	timeout  time.Duration
-	get      func(ctx context.Context, host string, eoj echonetlite.EOJ) (*echonetlite.StorageBattery, error)
+	client   storageBatteryClient
 	targets  []echonetlite.Device
 
 	acChargeableEnergyGauge    *prometheus.GaugeVec
@@ -26,23 +26,26 @@ type StorageBatteryCollector struct {
 	collectMetrics             *CollectMetrics
 }
 
+type storageBatteryClient interface {
+	Get(ctx context.Context, host string, eoj echonetlite.EOJ) (*echonetlite.StorageBattery, error)
+}
+
 type cumulativeStorageBatteryEnergyKey struct {
 	host string
 	eoj  string
 }
 
 func NewStorageBatteryCollector(
-	conn *echonetlite.Connection,
+	client storageBatteryClient,
 	interval time.Duration,
 	timeout time.Duration,
 	collectMetrics *CollectMetrics,
 	targets []echonetlite.Device,
 ) *StorageBatteryCollector {
-	client := echonetlite.NewStorageBatteryClient(conn)
 	return &StorageBatteryCollector{
 		interval: interval,
 		timeout:  timeout,
-		get:      client.Get,
+		client:   client,
 		targets:  targets,
 		acChargeableEnergyGauge: prometheus.NewGaugeVec(
 			prometheus.GaugeOpts{
@@ -130,7 +133,7 @@ func (c *StorageBatteryCollector) collectLoop(ctx context.Context, targets []ech
 func (c *StorageBatteryCollector) collect(ctx context.Context, devices []echonetlite.Device) {
 	for _, device := range devices {
 		reqCtx, cancel := context.WithTimeout(ctx, c.timeout)
-		props, err := c.get(reqCtx, device.Host(), device.EOJ())
+		props, err := c.client.Get(reqCtx, device.Host(), device.EOJ())
 		cancel()
 
 		if err != nil {
