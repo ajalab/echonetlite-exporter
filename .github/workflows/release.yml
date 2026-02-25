@@ -16,16 +16,8 @@ jobs:
         arch:
           - amd64
           - arm64
-        exclude:
-          - os: windows
-            arch: arm64
-        include:
-          - os: linux
-            format: tar.gz
-          - os: darwin
-            format: tar.gz
-          - os: windows
-            format: zip
+        format:
+          - tar.gz
     runs-on: ubuntu-latest
     steps:
       - name: Checkout
