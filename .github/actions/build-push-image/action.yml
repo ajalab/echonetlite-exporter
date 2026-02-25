@@ -19,6 +19,11 @@ runs:
       uses: docker/metadata-action@v5
       with:
         images: ghcr.io/ajalab/echonetlite-exporter
+        flavor: |
+          latest=false
+        tags: |
+          type=ref,event=tag
+          type=raw,value=latest,enable=${{ !contains(github.ref_name, '-') }}
     - name: Build and push container image
       uses: docker/build-push-action@v6
       with:
