@@ -5,7 +5,7 @@ go 1.25.5
 require (
 	github.com/prometheus/client_golang v1.23.2
 	golang.org/x/net v0.56.0
-	golang.org/x/sys v0.46.0
+	golang.org/x/sys v0.47.0
 )
 
 require (
