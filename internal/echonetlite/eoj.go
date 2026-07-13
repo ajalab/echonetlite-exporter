@@ -4,6 +4,7 @@ import "fmt"
 
 const (
 	ClassPowerDistributionBoardMetering = 0x0287
+	ClassDRElectricEnergyMeter          = 0x028E
 	ClassPVPowerGeneration              = 0x0279
 	ClassStorageBattery                 = 0x027D
 	ClassMultipleInputPCS               = 0x02A5

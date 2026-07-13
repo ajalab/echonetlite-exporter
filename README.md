@@ -62,6 +62,22 @@ Prefix: `echonetlite_power_distribution_board_metering`
 |`<prefix>_electric_energy_simplex_joules_total`|cumulativeElectricEnergyListSimplex|0xB3|
 |`<prefix>_electric_power_simplex_watts`|instantaneousElectricPowerListSimplex|0xB7|
 
+### 分散型電源電力量メータ (Distributed generator's electric energy meter)
+
+Prefix: `echonetlite_dr_electric_energy_meter`
+
+|Metric family|ECHONET Lite property (shortName)|EPC|
+|---|---|---|
+|`<prefix>_ac_input_electric_energy_joules_total`|acInputCumulativeElectricEnergy|0xE0|
+|`<prefix>_ac_output_electric_energy_joules_total`|acOutputCumulativeElectricEnergy|0xE2|
+|`<prefix>_independent_operation_electric_energy_joules_total`|independentOperationCumulativeElectricEnergy|0xE4|
+|`<prefix>_ac_inout_electric_power_watts`|acInstantaneousElectricPower|0xE9|
+|`<prefix>_independent_operation_electric_power_watts`|independentOperationInstantaneousElectricPower|0xEA|
+
+Notes:
+- Cumulative energy values are scaled by `0xD4` (`cumulativeAmountsOfElectricEnergyUnit`) and exported as joules.
+- This exporter treats missing requested DR meter properties and `NoData` values (`E4`, `E9`, `EA`) as collection failures.
+
 ### 蓄電池 (Storage battery)
 
 Prefix: `echonetlite_storage_battery`
