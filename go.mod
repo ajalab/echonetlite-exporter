@@ -1,11 +1,11 @@
 module github.com/ajalab/echonetlite-exporter
 
-go 1.25.5
+go 1.26.0
 
 require (
 	github.com/prometheus/client_golang v1.24.1
 	golang.org/x/net v0.57.0
-	golang.org/x/sys v0.47.0
+	golang.org/x/sys v0.48.0
 )
 
 require (
