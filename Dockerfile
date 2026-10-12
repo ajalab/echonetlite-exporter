@@ -1,8 +1,4 @@
-ARG TARGETARCH
-ARG TARGETOS
-ARG GO_VERSION=1.25
-
-FROM --platform=$BUILDPLATFORM golang:${GO_VERSION} AS builder
+FROM --platform=$BUILDPLATFORM golang:1.26 AS builder
 
 WORKDIR /src
 
@@ -12,6 +8,9 @@ RUN --mount=type=cache,target=/go/pkg/mod/,sharing=locked \
     --mount=type=bind,source=go.sum,target=go.sum \
     --mount=type=bind,source=go.mod,target=go.mod \
     go mod download
+
+ARG TARGETARCH
+ARG TARGETOS
 
 RUN --mount=type=cache,target=/go/pkg/mod/ \
     --mount=type=bind,target=. \
