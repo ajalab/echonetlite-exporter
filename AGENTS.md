@@ -14,10 +14,13 @@
 
 ## Prometheus metrics
 
-- Prefix device metric names with `echonetlite_<device_class>_`.
-- Use Prometheus base-unit suffixes such as `_watts` and `_joules`.
+- Use `echonetlite_<device_object_class>_<device_object_property>` as the base for metric names.
+- Use the full ECHONET Lite MRA `shortName` of the device object class in `snake_case` for `<device_object_class>`, as in `instantaneousWaterHeater` → `instantaneous_water_heater`.
+- Use the ECHONET Lite MRA `shortName` of the device object property in `snake_case` for `<device_object_property>`.
+- Omit `instantaneous` and `cumulative` only from `<device_object_property>` when they describe the reading.
+- Append a Prometheus base-unit suffix to metrics with units, such as `_watts`, `_joules`, `_celsius`, or `_cubic_meters`.
+- Omit the unit suffix for dimensionless states.
 - Export instantaneous readings as gauges.
 - Export cumulative readings as counters.
-- End counter names with `_total`.
-- Omit `instantaneous` and `cumulative` from metric names.
+- End counter names with `_total` after any unit suffix, as in `echonetlite_watt_hour_meter_electric_energy_joules_total` for `wattHourMeter` / `cumulativeElectricEnergy`.
 - Preserve the names, labels, units, and types of existing metrics.
