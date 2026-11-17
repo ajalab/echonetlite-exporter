@@ -103,7 +103,7 @@ Prefix: `echonetlite_multiple_input_pcs`
 
 Prefix: `echonetlite_instantaneous_water_heater`
 
-|Metric family (gauge)|ECHONET Lite property (shortName)|EPC|Read support|
+|Metric family|ECHONET Lite property (shortName)|EPC|Read support|
 |---|---|---|---|
 |`<prefix>_hot_water_heating_status`|hotWaterHeatingStatus|0xD0|Required|
 |`<prefix>_bath_water_heating_status`|bathWaterHeatingStatus|0xE2|Required|
@@ -118,7 +118,7 @@ Prefix: `echonetlite_instantaneous_water_heater`
 
 Prefix: `echonetlite_watt_hour_meter`
 
-|Metric family (counter)|ECHONET Lite property (shortName)|EPC|
+|Metric family|ECHONET Lite property (shortName)|EPC|
 |---|---|---|
 |`<prefix>_electric_energy_joules_total`|cumulativeElectricEnergy|0xE0|
 
@@ -126,7 +126,7 @@ Prefix: `echonetlite_watt_hour_meter`
 
 Prefix: `echonetlite_water_flow_meter`
 
-|Metric family (counter)|ECHONET Lite property (shortName)|EPC|
+|Metric family|ECHONET Lite property (shortName)|EPC|
 |---|---|---|
 |`<prefix>_flowing_water_cubic_meters_total`|cumulativeFlowingWater|0xE0|
 
@@ -134,7 +134,7 @@ Prefix: `echonetlite_water_flow_meter`
 
 Prefix: `echonetlite_gas_meter`
 
-|Metric family (counter)|ECHONET Lite property (shortName)|EPC|
+|Metric family|ECHONET Lite property (shortName)|EPC|
 |---|---|---|
 |`<prefix>_gas_consumption_cubic_meters_total`|cumulativeGasConsumption|0xE0|
 
@@ -142,7 +142,7 @@ Prefix: `echonetlite_gas_meter`
 
 Prefix: `echonetlite_hybrid_water_heater`
 
-|Metric family (gauge)|ECHONET Lite property (shortName)|EPC|Read support|
+|Metric family|ECHONET Lite property (shortName)|EPC|Read support|
 |---|---|---|---|
 |`<prefix>_linkage_mode_for_solar_power_generation`|linkageModeForSolarPowerGeneration|0xB8|Required|
 |`<prefix>_water_heating_status`|waterHeatingStatus|0xB2|Optional|
