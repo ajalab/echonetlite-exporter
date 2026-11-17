@@ -23,4 +23,7 @@
 - Export instantaneous readings as gauges.
 - Export cumulative readings as counters.
 - End counter names with `_total` after any unit suffix, as in `echonetlite_watt_hour_meter_electric_energy_joules_total` for `wattHourMeter` / `cumulativeElectricEnergy`.
+- For device metrics, use the ECHONET Lite MRA `propertyName.en` followed by a period as the Prometheus `HELP` text.
+- By default, export one time series per device object instance and property.
+- Do not use MRA property values as metric label values.
 - Preserve the names, labels, units, and types of existing metrics.

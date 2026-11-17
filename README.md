@@ -98,3 +98,55 @@ Prefix: `echonetlite_multiple_input_pcs`
 |`<prefix>_normal_direction_electric_energy_joules_total`|normalDirectionElectricEnergy|0xE0|
 |`<prefix>_reverse_direction_electric_energy_joules_total`|reverseDirectionElectricEnergy|0xE3|
 |`<prefix>_electric_power_watts`|instantaneousElectricPower|0xE7|
+
+### 瞬間式給湯器 (Instantaneous water heater, 0x0272)
+
+Prefix: `echonetlite_instantaneous_water_heater`
+
+|Metric family|ECHONET Lite property (shortName)|EPC|Read support|
+|---|---|---|---|
+|`<prefix>_hot_water_heating_status`|hotWaterHeatingStatus|0xD0|Required|
+|`<prefix>_bath_water_heating_status`|bathWaterHeatingStatus|0xE2|Required|
+|`<prefix>_automatic_bath_operation`|automaticBathOperation|0xE3|Option-mandatory|
+|`<prefix>_target_supplied_water_temperature_celsius`|targetSuppliedWaterTemperature|0xD1|Optional|
+|`<prefix>_target_bath_water_temperature_celsius`|targetBathWaterTemperature|0xE1|Optional|
+|`<prefix>_shower_hot_water_supply_status`|showerHotWaterSupplyStatus|0xEA|Optional|
+|`<prefix>_kitchen_hot_water_supply_status`|kitchenHotWaterSupplyStatus|0xEB|Optional|
+|`<prefix>_bath_operation_status`|bathOperationStatus|0xEF|Optional|
+
+### 電力量メータ (Watt-hour meter, 0x0280)
+
+Prefix: `echonetlite_watt_hour_meter`
+
+|Metric family|ECHONET Lite property (shortName)|EPC|
+|---|---|---|
+|`<prefix>_electric_energy_joules_total`|cumulativeElectricEnergy|0xE0|
+
+### 水流量メータ (Water flowmeter, 0x0281)
+
+Prefix: `echonetlite_water_flow_meter`
+
+|Metric family|ECHONET Lite property (shortName)|EPC|
+|---|---|---|
+|`<prefix>_flowing_water_cubic_meters_total`|cumulativeFlowingWater|0xE0|
+
+### ガスメータ (Gas meter, 0x0282)
+
+Prefix: `echonetlite_gas_meter`
+
+|Metric family|ECHONET Lite property (shortName)|EPC|
+|---|---|---|
+|`<prefix>_gas_consumption_cubic_meters_total`|cumulativeGasConsumption|0xE0|
+
+### ハイブリッド給湯機 (Hybrid water heater, 0x02A6)
+
+Prefix: `echonetlite_hybrid_water_heater`
+
+|Metric family|ECHONET Lite property (shortName)|EPC|Read support|
+|---|---|---|---|
+|`<prefix>_linkage_mode_for_solar_power_generation`|linkageModeForSolarPowerGeneration|0xB8|Required|
+|`<prefix>_water_heating_status`|waterHeatingStatus|0xB2|Optional|
+|`<prefix>_heater_status`|heaterStatus|0xB3|Optional|
+|`<prefix>_hot_water_supply_status`|hotWaterSupplyStatus|0xC3|Optional|
+|`<prefix>_remaining_water_cubic_meters`|remainingWater|0xE1|Optional|
+|`<prefix>_tank_capacity_cubic_meters`|tankCapacity|0xE2|Optional|

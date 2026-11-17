@@ -8,6 +8,11 @@ const (
 	ClassPVPowerGeneration              = 0x0279
 	ClassStorageBattery                 = 0x027D
 	ClassMultipleInputPCS               = 0x02A5
+	ClassInstantaneousWaterHeater       = 0x0272
+	ClassWattHourMeter                  = 0x0280
+	ClassWaterFlowMeter                 = 0x0281
+	ClassGasMeter                       = 0x0282
+	ClassHybridWaterHeater              = 0x02A6
 )
 
 // EOJ represents an ECHONET Lite object identifier.
