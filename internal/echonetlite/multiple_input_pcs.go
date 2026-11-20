@@ -2,7 +2,6 @@ package echonetlite
 
 import (
 	"context"
-	"encoding/binary"
 	"fmt"
 )
 
@@ -21,51 +20,30 @@ func NewMultipleInputPCSClient(conn *Connection) *MultipleInputPCSClient {
 }
 
 func (c *MultipleInputPCSClient) Get(ctx context.Context, host string, eoj EOJ) (*MultipleInputPCS, error) {
-	getReq := Frame{
-		SEOJ: EOJ{0x05, 0xFF, 0x01},
-		DEOJ: eoj,
-		ESV:  0x62,
-		Properties: []Property{
-			{EPC: epcMultipleInputPCSNormalDirectionElectricEnergy, EDT: []byte{}},
-			{EPC: epcMultipleInputPCSReverseDirectionElectricEnergy, EDT: []byte{}},
-			{EPC: epcMultipleInputPCSInstantaneousElectricPower, EDT: []byte{}},
-		},
-	}
-	resFrame, err := c.conn.Unicast(ctx, host, getReq)
+	read := propertyReader{conn: c.conn, host: host, eoj: eoj}
+	values, err := read.required(ctx,
+		epcMultipleInputPCSNormalDirectionElectricEnergy,
+		epcMultipleInputPCSReverseDirectionElectricEnergy,
+		epcMultipleInputPCSInstantaneousElectricPower,
+	)
 	if err != nil {
 		return nil, err
 	}
-	if len(resFrame.Properties) != len(getReq.Properties) {
-		return nil, fmt.Errorf("unexpected property count: got %d, want %d", len(resFrame.Properties), len(getReq.Properties))
-	}
 
-	mipcs := &MultipleInputPCS{}
-	for _, prop := range resFrame.Properties {
-		switch prop.EPC {
-		case epcMultipleInputPCSNormalDirectionElectricEnergy:
-			val, err := parseMultipleInputPCSElectricEnergy(prop.EDT)
-			if err != nil {
-				return nil, fmt.Errorf("invalid normalDirectionElectricEnergy data: %w", err)
-			}
-			mipcs.NormalDirectionElectricEnergy = val
-		case epcMultipleInputPCSReverseDirectionElectricEnergy:
-			val, err := parseMultipleInputPCSElectricEnergy(prop.EDT)
-			if err != nil {
-				return nil, fmt.Errorf("invalid reverseDirectionElectricEnergy data: %w", err)
-			}
-			mipcs.ReverseDirectionElectricEnergy = val
-		case epcMultipleInputPCSInstantaneousElectricPower:
-			val, err := parseMultipleInputPCSInstantaneousElectricPower(prop.EDT)
-			if err != nil {
-				return nil, fmt.Errorf("invalid instantaneousElectricPower data: %w", err)
-			}
-			mipcs.InstantaneousElectricPower = val
-		default:
-			return nil, fmt.Errorf("unexpected EPC: 0x%X", prop.EPC)
-		}
+	reading := &MultipleInputPCS{}
+	reading.NormalDirectionElectricEnergy, err = decodeMeterValue(values[epcMultipleInputPCSNormalDirectionElectricEnergy], 999_999_999)
+	if err != nil {
+		return nil, fmt.Errorf("normalDirectionElectricEnergy (EPC 0x%02X): %w", epcMultipleInputPCSNormalDirectionElectricEnergy, err)
 	}
-
-	return mipcs, nil
+	reading.ReverseDirectionElectricEnergy, err = decodeMeterValue(values[epcMultipleInputPCSReverseDirectionElectricEnergy], 999_999_999)
+	if err != nil {
+		return nil, fmt.Errorf("reverseDirectionElectricEnergy (EPC 0x%02X): %w", epcMultipleInputPCSReverseDirectionElectricEnergy, err)
+	}
+	reading.InstantaneousElectricPower, err = decodeElectricPower(values[epcMultipleInputPCSInstantaneousElectricPower])
+	if err != nil {
+		return nil, fmt.Errorf("instantaneousElectricPower (EPC 0x%02X): %w", epcMultipleInputPCSInstantaneousElectricPower, err)
+	}
+	return reading, nil
 }
 
 type MultipleInputPCS struct {
@@ -79,18 +57,4 @@ type MultipleInputPCS struct {
 
 	// This property indicates the measured instantaneous electric power in watts.
 	InstantaneousElectricPower int32
-}
-
-func parseMultipleInputPCSElectricEnergy(edts []byte) (uint32, error) {
-	if len(edts) != 4 {
-		return 0, fmt.Errorf("expected 4 bytes, got %d", len(edts))
-	}
-	return binary.BigEndian.Uint32(edts), nil
-}
-
-func parseMultipleInputPCSInstantaneousElectricPower(edts []byte) (int32, error) {
-	if len(edts) != 4 {
-		return 0, fmt.Errorf("expected 4 bytes, got %d", len(edts))
-	}
-	return int32(binary.BigEndian.Uint32(edts)), nil
 }

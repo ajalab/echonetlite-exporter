@@ -1,81 +1,29 @@
 package collector
 
 import (
-	"context"
-	"errors"
 	"testing"
-	"time"
 
 	"github.com/ajalab/echonetlite-exporter/internal/echonetlite"
-	"github.com/prometheus/client_golang/prometheus/testutil"
 )
 
-type fakeStorageBatteryClient struct {
-	getFn func(ctx context.Context, host string, eoj echonetlite.EOJ) (*echonetlite.StorageBattery, error)
-}
-
-func (f fakeStorageBatteryClient) Get(ctx context.Context, host string, eoj echonetlite.EOJ) (*echonetlite.StorageBattery, error) {
-	return f.getFn(ctx, host, eoj)
-}
-
-func TestStorageBatteryCollectSuccessUpdatesMetricsAndSuccessState(t *testing.T) {
-	collectMetrics := NewCollectMetrics()
-	device := echonetlite.NewDevice("192.0.2.12", echonetlite.EOJ{0x02, 0x7D, 0x01})
-	c := NewStorageBatteryCollector(
-		fakeStorageBatteryClient{
-			getFn: func(ctx context.Context, host string, eoj echonetlite.EOJ) (*echonetlite.StorageBattery, error) {
-				return &echonetlite.StorageBattery{
-					ACChargeableElectricEnergy:            2,
-					ACDischargeableElectricEnergy:         3,
-					ACCumulativeChargingElectricEnergy:    4,
-					ACCumulativeDischargingElectricEnergy: 5,
-				}, nil
-			},
-		},
-		time.Second,
-		time.Second,
-		collectMetrics,
-		[]echonetlite.Device{device},
-	)
-	c.collect(context.Background(), []echonetlite.Device{device})
-	assertCollectSuccess(t, collectMetrics, device, 1)
-
-	gotChargeable := testutil.ToFloat64(
-		c.acChargeableEnergyGauge.WithLabelValues(device.Host(), device.EOJ().String()),
-	)
-	assertFloatEqual(t, gotChargeable, 7200)
-	gotDischargeable := testutil.ToFloat64(
-		c.acDischargeableEnergyGauge.WithLabelValues(device.Host(), device.EOJ().String()),
-	)
-	assertFloatEqual(t, gotDischargeable, 10800)
-
-	key := cumulativeStorageBatteryEnergyKey{host: device.Host(), eoj: device.EOJ().String()}
-	gotCharging, ok := c.acChargingEnergy[key]
-	if !ok {
-		t.Fatalf("expected cumulative charging energy for key %+v", key)
+func TestStorageBatteryCollectorPublishesMetrics(t *testing.T) {
+	reading := &echonetlite.StorageBattery{
+		ACChargeableElectricEnergy: 125, ACDischargeableElectricEnergy: 250,
+		ACCumulativeChargingElectricEnergy: 500, ACCumulativeDischargingElectricEnergy: 750,
 	}
-	assertFloatEqual(t, gotCharging, 14400)
-	gotDischarging, ok := c.acDischargingEnergy[key]
-	if !ok {
-		t.Fatalf("expected cumulative discharging energy for key %+v", key)
-	}
-	assertFloatEqual(t, gotDischarging, 18000)
-}
-
-func TestStorageBatteryCollectFailureSetsSuccessState(t *testing.T) {
-	collectMetrics := NewCollectMetrics()
-	device := echonetlite.NewDevice("192.0.2.12", echonetlite.EOJ{0x02, 0x7D, 0x01})
-	c := NewStorageBatteryCollector(
-		fakeStorageBatteryClient{
-			getFn: func(ctx context.Context, host string, eoj echonetlite.EOJ) (*echonetlite.StorageBattery, error) {
-				return nil, errors.New("test error")
-			},
-		},
-		time.Second,
-		time.Second,
-		collectMetrics,
-		[]echonetlite.Device{device},
-	)
-	c.collect(context.Background(), []echonetlite.Device{device})
-	assertCollectSuccess(t, collectMetrics, device, 0)
+	const want = `
+# HELP echonetlite_storage_battery_ac_chargeable_electric_energy_joules AC chargeable electric energy.
+# TYPE echonetlite_storage_battery_ac_chargeable_electric_energy_joules gauge
+echonetlite_storage_battery_ac_chargeable_electric_energy_joules{eoj="027D01",host="192.0.2.10"} 450000
+# HELP echonetlite_storage_battery_ac_charging_electric_energy_joules_total AC measured cumulative charging electric energy.
+# TYPE echonetlite_storage_battery_ac_charging_electric_energy_joules_total counter
+echonetlite_storage_battery_ac_charging_electric_energy_joules_total{eoj="027D01",host="192.0.2.10"} 1800000
+# HELP echonetlite_storage_battery_ac_dischargeable_electric_energy_joules AC dischargeable electric energy.
+# TYPE echonetlite_storage_battery_ac_dischargeable_electric_energy_joules gauge
+echonetlite_storage_battery_ac_dischargeable_electric_energy_joules{eoj="027D01",host="192.0.2.10"} 900000
+# HELP echonetlite_storage_battery_ac_discharging_electric_energy_joules_total AC measured cumulative discharging electric energy.
+# TYPE echonetlite_storage_battery_ac_discharging_electric_energy_joules_total counter
+echonetlite_storage_battery_ac_discharging_electric_energy_joules_total{eoj="027D01",host="192.0.2.10"} 2700000
+`
+	assertPublishedMetrics(t, NewStorageBatteryCollector, echonetlite.ClassStorageBattery, reading, want)
 }

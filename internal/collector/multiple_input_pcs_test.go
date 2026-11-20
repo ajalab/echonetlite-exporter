@@ -1,76 +1,26 @@
 package collector
 
 import (
-	"context"
-	"errors"
 	"testing"
-	"time"
 
 	"github.com/ajalab/echonetlite-exporter/internal/echonetlite"
-	"github.com/prometheus/client_golang/prometheus/testutil"
 )
 
-type fakeMultipleInputPCSClient struct {
-	getFn func(ctx context.Context, host string, eoj echonetlite.EOJ) (*echonetlite.MultipleInputPCS, error)
-}
-
-func (f fakeMultipleInputPCSClient) Get(ctx context.Context, host string, eoj echonetlite.EOJ) (*echonetlite.MultipleInputPCS, error) {
-	return f.getFn(ctx, host, eoj)
-}
-
-func TestMultipleInputPCSCollectSuccessUpdatesMetricsAndSuccessState(t *testing.T) {
-	collectMetrics := NewCollectMetrics()
-	device := echonetlite.NewDevice("192.0.2.20", echonetlite.EOJ{0x02, 0xA5, 0x01})
-	c := NewMultipleInputPCSCollector(
-		fakeMultipleInputPCSClient{
-			getFn: func(ctx context.Context, host string, eoj echonetlite.EOJ) (*echonetlite.MultipleInputPCS, error) {
-				return &echonetlite.MultipleInputPCS{
-					NormalDirectionElectricEnergy:  2,
-					ReverseDirectionElectricEnergy: 3,
-					InstantaneousElectricPower:     -120,
-				}, nil
-			},
-		},
-		time.Second,
-		time.Second,
-		collectMetrics,
-		[]echonetlite.Device{device},
-	)
-	c.collect(context.Background(), []echonetlite.Device{device})
-	assertCollectSuccess(t, collectMetrics, device, 1)
-
-	gotPower := testutil.ToFloat64(
-		c.instantaneousElectricPowerGauge.WithLabelValues(device.Host(), device.EOJ().String()),
-	)
-	assertFloatEqual(t, gotPower, -120)
-
-	key := cumulativeMultipleInputPCSEnergyKey{host: device.Host(), eoj: device.EOJ().String()}
-	gotNormal, ok := c.normalDirectionEnergy[key]
-	if !ok {
-		t.Fatalf("expected normal direction energy for key %+v", key)
+func TestMultipleInputPCSCollectorPublishesMetrics(t *testing.T) {
+	reading := &echonetlite.MultipleInputPCS{
+		NormalDirectionElectricEnergy: 10, ReverseDirectionElectricEnergy: 20,
+		InstantaneousElectricPower: -100,
 	}
-	assertFloatEqual(t, gotNormal, 7200)
-	gotReverse, ok := c.reverseDirectionEnergy[key]
-	if !ok {
-		t.Fatalf("expected reverse direction energy for key %+v", key)
-	}
-	assertFloatEqual(t, gotReverse, 10800)
-}
-
-func TestMultipleInputPCSCollectFailureSetsSuccessState(t *testing.T) {
-	collectMetrics := NewCollectMetrics()
-	device := echonetlite.NewDevice("192.0.2.20", echonetlite.EOJ{0x02, 0xA5, 0x01})
-	c := NewMultipleInputPCSCollector(
-		fakeMultipleInputPCSClient{
-			getFn: func(ctx context.Context, host string, eoj echonetlite.EOJ) (*echonetlite.MultipleInputPCS, error) {
-				return nil, errors.New("test error")
-			},
-		},
-		time.Second,
-		time.Second,
-		collectMetrics,
-		[]echonetlite.Device{device},
-	)
-	c.collect(context.Background(), []echonetlite.Device{device})
-	assertCollectSuccess(t, collectMetrics, device, 0)
+	const want = `
+# HELP echonetlite_multiple_input_pcs_electric_power_watts Measured instantaneous electric power.
+# TYPE echonetlite_multiple_input_pcs_electric_power_watts gauge
+echonetlite_multiple_input_pcs_electric_power_watts{eoj="02A501",host="192.0.2.10"} -100
+# HELP echonetlite_multiple_input_pcs_normal_direction_electric_energy_joules_total Measured cumulative amount of electric energy (normal direction).
+# TYPE echonetlite_multiple_input_pcs_normal_direction_electric_energy_joules_total counter
+echonetlite_multiple_input_pcs_normal_direction_electric_energy_joules_total{eoj="02A501",host="192.0.2.10"} 36000
+# HELP echonetlite_multiple_input_pcs_reverse_direction_electric_energy_joules_total Measured cumulative amount of electric energy (reverse direction).
+# TYPE echonetlite_multiple_input_pcs_reverse_direction_electric_energy_joules_total counter
+echonetlite_multiple_input_pcs_reverse_direction_electric_energy_joules_total{eoj="02A501",host="192.0.2.10"} 72000
+`
+	assertPublishedMetrics(t, NewMultipleInputPCSCollector, echonetlite.ClassMultipleInputPCS, reading, want)
 }

@@ -1,33 +1,140 @@
 package collector
 
 import (
+	"context"
+	"log/slog"
+	"sync"
+	"time"
+
+	"github.com/ajalab/echonetlite-exporter/internal/echonetlite"
 	"github.com/prometheus/client_golang/prometheus"
 )
 
-type CollectMetrics struct {
-	successGauge *prometheus.GaugeVec
+// collector publishes the last successful collection from each device.
+type collector struct {
+	interval time.Duration
+	targets  []echonetlite.Device
+	descs    []*prometheus.Desc
+	read     func(context.Context, echonetlite.Device) ([]prometheus.Metric, error)
+
+	successDescs map[echonetlite.Device]*prometheus.Desc
+
+	mu      sync.RWMutex
+	metrics map[echonetlite.Device]deviceMetrics
 }
 
-func NewCollectMetrics() *CollectMetrics {
-	return &CollectMetrics{
-		successGauge: prometheus.NewGaugeVec(
-			prometheus.GaugeOpts{
-				Name: "echonetlite_collector_success",
-				Help: "Whether the last collection was successful (1 for success, 0 for failure).",
-			},
-			[]string{"host", "eoj"},
-		),
+type deviceMetrics struct {
+	values  []prometheus.Metric
+	success prometheus.Metric
+}
+
+var deviceLabels = []string{"host", "eoj"}
+
+const (
+	joulesPerWattHour     = 3_600
+	joulesPerKilowattHour = 3_600_000
+)
+
+func newCollector[T any](
+	interval time.Duration,
+	targets []echonetlite.Device,
+	descs []*prometheus.Desc,
+	get func(context.Context, string, echonetlite.EOJ) (*T, error),
+	metrics func(echonetlite.Device, *T) []prometheus.Metric,
+) *collector {
+	successDescs := make(map[echonetlite.Device]*prometheus.Desc, len(targets))
+	for _, device := range targets {
+		// Fixed device labels give each collector a distinct descriptor for this family.
+		successDescs[device] = prometheus.NewDesc(
+			"echonetlite_collector_success",
+			"Whether the last collection was successful (1 for success, 0 for failure).",
+			nil, prometheus.Labels{"host": device.Host(), "eoj": device.EOJ().String()},
+		)
+	}
+	return &collector{
+		interval:     interval,
+		targets:      targets,
+		descs:        descs,
+		successDescs: successDescs,
+		read: func(ctx context.Context, device echonetlite.Device) ([]prometheus.Metric, error) {
+			reading, err := get(ctx, device.Host(), device.EOJ())
+			if err != nil {
+				return nil, err
+			}
+			return metrics(device, reading), nil
+		},
+		metrics: make(map[echonetlite.Device]deviceMetrics),
 	}
 }
 
-func (m *CollectMetrics) Collector() prometheus.Collector {
-	return m.successGauge
+func (c *collector) Start(ctx context.Context) {
+	go c.run(ctx)
 }
 
-func (m *CollectMetrics) SetSuccess(host, eoj string, success bool) {
-	if success {
-		m.successGauge.WithLabelValues(host, eoj).Set(1)
-	} else {
-		m.successGauge.WithLabelValues(host, eoj).Set(0)
+func (c *collector) run(ctx context.Context) {
+	ticker := time.NewTicker(c.interval)
+	defer ticker.Stop()
+
+	c.collect(ctx)
+	for {
+		select {
+		case <-ticker.C:
+			c.collect(ctx)
+		case <-ctx.Done():
+			return
+		}
 	}
+}
+
+func (c *collector) Describe(ch chan<- *prometheus.Desc) {
+	for _, desc := range c.successDescs {
+		ch <- desc
+	}
+	for _, desc := range c.descs {
+		ch <- desc
+	}
+}
+
+func (c *collector) Collect(ch chan<- prometheus.Metric) {
+	c.mu.RLock()
+	var metrics []prometheus.Metric
+	for _, deviceMetrics := range c.metrics {
+		metrics = append(metrics, deviceMetrics.success)
+		metrics = append(metrics, deviceMetrics.values...)
+	}
+	c.mu.RUnlock()
+
+	for _, metric := range metrics {
+		ch <- metric
+	}
+}
+
+func (c *collector) collect(ctx context.Context) {
+	for _, device := range c.targets {
+		if ctx.Err() != nil {
+			return
+		}
+		metrics, err := c.read(ctx, device)
+		if ctx.Err() != nil {
+			return
+		}
+		c.mu.Lock()
+		state := c.metrics[device]
+		if err == nil {
+			state.values = metrics
+		}
+		state.success = prometheus.MustNewConstMetric(c.successDescs[device], prometheus.GaugeValue, boolValue(err == nil))
+		c.metrics[device] = state
+		c.mu.Unlock()
+		if err != nil {
+			slog.Warn("failed to collect stats", "host", device.Host(), "eoj", device.EOJ().String(), "err", err)
+		}
+	}
+}
+
+func boolValue(on bool) float64 {
+	if on {
+		return 1
+	}
+	return 0
 }

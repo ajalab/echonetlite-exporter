@@ -1,31 +1,44 @@
 package collector
 
 import (
-	"math"
+	"context"
+	"fmt"
+	"strings"
 	"testing"
+	"time"
 
 	"github.com/ajalab/echonetlite-exporter/internal/echonetlite"
+	"github.com/prometheus/client_golang/prometheus"
 	"github.com/prometheus/client_golang/prometheus/testutil"
 )
 
-func assertCollectSuccess(t *testing.T, collectMetrics *CollectMetrics, device echonetlite.Device, want float64) {
-	t.Helper()
-	got := testutil.ToFloat64(
-		collectMetrics.successGauge.WithLabelValues(device.Host(), device.EOJ().String()),
-	)
-	assertFloatEqual(t, got, want)
+type testCollector interface {
+	prometheus.Collector
+	collect(context.Context)
 }
 
-func assertFloatEqual(t *testing.T, got, want float64) {
+func assertPublishedMetrics[T any, C testCollector](
+	t *testing.T,
+	build func(func(context.Context, string, echonetlite.EOJ) (*T, error), time.Duration, []echonetlite.Device) C,
+	class uint16,
+	reading *T,
+	want string,
+) {
 	t.Helper()
-	if got != want {
-		t.Fatalf("expected %v, got %v", want, got)
-	}
-}
+	device := echonetlite.NewDevice("192.0.2.10", echonetlite.EOJ{byte(class >> 8), byte(class), 1})
+	c := build(func(context.Context, string, echonetlite.EOJ) (*T, error) {
+		return reading, nil
+	}, time.Second, []echonetlite.Device{device})
+	c.collect(t.Context())
 
-func assertFloatApprox(t *testing.T, got, want, tol float64) {
-	t.Helper()
-	if math.Abs(got-want) > tol {
-		t.Fatalf("expected about %v, got %v (tol=%v)", want, got, tol)
+	wantSuccess := fmt.Sprintf(`
+# HELP echonetlite_collector_success Whether the last collection was successful (1 for success, 0 for failure).
+# TYPE echonetlite_collector_success gauge
+echonetlite_collector_success{eoj=%q,host=%q} 1
+`, device.EOJ().String(), device.Host())
+	registry := prometheus.NewPedanticRegistry()
+	registry.MustRegister(c)
+	if err := testutil.GatherAndCompare(registry, strings.NewReader(wantSuccess+want)); err != nil {
+		t.Fatal(err)
 	}
 }

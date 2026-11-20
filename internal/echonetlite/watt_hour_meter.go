@@ -25,8 +25,8 @@ func NewWattHourMeterClient(conn *Connection) *WattHourMeterClient {
 }
 
 func (c *WattHourMeterClient) Get(ctx context.Context, host string, eoj EOJ) (*WattHourMeter, error) {
-	values, err := getRequiredProperties(ctx, c.conn, host, eoj,
-		epcCumulativeElectricEnergy, epcWattHourMeterCumulativeElectricEnergyUnit)
+	read := propertyReader{conn: c.conn, host: host, eoj: eoj}
+	values, err := read.required(ctx, epcCumulativeElectricEnergy, epcWattHourMeterCumulativeElectricEnergyUnit)
 	if err != nil {
 		return nil, err
 	}
@@ -34,12 +34,12 @@ func (c *WattHourMeterClient) Get(ctx context.Context, host string, eoj EOJ) (*W
 	if err != nil {
 		return nil, fmt.Errorf("invalid cumulativeElectricEnergy: %w", err)
 	}
-	unit := decodeByte(values[epcWattHourMeterCumulativeElectricEnergyUnit], 0x01, 0x02)
-	if unit == nil {
-		return nil, fmt.Errorf("invalid cumulativeAmountsOfElectricEnergyUnit: %X", values[epcWattHourMeterCumulativeElectricEnergyUnit])
+	unit, err := decodeByte(values[epcWattHourMeterCumulativeElectricEnergyUnit], 0x01, 0x02)
+	if err != nil {
+		return nil, fmt.Errorf("cumulativeAmountsOfElectricEnergyUnit (EPC 0xE2): %w", err)
 	}
 	return &WattHourMeter{
 		CumulativeElectricEnergy:              energy,
-		CumulativeAmountsOfElectricEnergyUnit: math.Pow10(-int(*unit)),
+		CumulativeAmountsOfElectricEnergyUnit: math.Pow10(-int(unit)),
 	}, nil
 }

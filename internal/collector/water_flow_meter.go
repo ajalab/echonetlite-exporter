@@ -2,112 +2,37 @@ package collector
 
 import (
 	"context"
-	"log/slog"
-	"sync"
 	"time"
 
 	"github.com/ajalab/echonetlite-exporter/internal/echonetlite"
 	"github.com/prometheus/client_golang/prometheus"
 )
 
+// WaterFlowMeterCollector collects and publishes metrics for its ECHONET Lite device class.
 type WaterFlowMeterCollector struct {
-	interval time.Duration
-	timeout  time.Duration
-	client   waterFlowMeterClient
-	targets  []echonetlite.Device
-
-	volumeDesc     *prometheus.Desc
-	volume         map[echonetlite.Device]float64
-	volumeMu       sync.Mutex
-	collectMetrics *CollectMetrics
+	*collector
 }
 
-type waterFlowMeterClient interface {
-	Get(ctx context.Context, host string, eoj echonetlite.EOJ) (*echonetlite.WaterFlowMeter, error)
-}
-
+// NewWaterFlowMeterCollector creates a WaterFlowMeterCollector.
 func NewWaterFlowMeterCollector(
-	client waterFlowMeterClient,
+	get func(context.Context, string, echonetlite.EOJ) (*echonetlite.WaterFlowMeter, error),
 	interval time.Duration,
-	timeout time.Duration,
-	collectMetrics *CollectMetrics,
 	targets []echonetlite.Device,
 ) *WaterFlowMeterCollector {
+	flow := prometheus.NewDesc(
+		"echonetlite_water_flow_meter_flowing_water_cubic_meters_total",
+		"Measured cumulative amount of flowing water.",
+		deviceLabels, nil,
+	)
+	descs := []*prometheus.Desc{flow}
 	return &WaterFlowMeterCollector{
-		interval: interval,
-		timeout:  timeout,
-		client:   client,
-		targets:  targets,
-		volumeDesc: prometheus.NewDesc(
-			"echonetlite_water_flow_meter_flowing_water_cubic_meters_total",
-			"Measured cumulative amount of flowing water.",
-			[]string{"host", "eoj"},
-			nil,
+		collector: newCollector(interval, targets, descs, get,
+			func(device echonetlite.Device, reading *echonetlite.WaterFlowMeter) []prometheus.Metric {
+				host, eoj := device.Host(), device.EOJ().String()
+				return []prometheus.Metric{
+					prometheus.MustNewConstMetric(flow, prometheus.CounterValue, float64(reading.CumulativeFlowingWater)*reading.UnitForCumulativeFlowingWater, host, eoj),
+				}
+			},
 		),
-		volume:         make(map[echonetlite.Device]float64),
-		collectMetrics: collectMetrics,
 	}
-}
-
-func (c *WaterFlowMeterCollector) Start(ctx context.Context) {
-	go c.collectLoop(ctx, c.targets)
-}
-
-func (c *WaterFlowMeterCollector) Describe(ch chan<- *prometheus.Desc) {
-	ch <- c.volumeDesc
-}
-
-func (c *WaterFlowMeterCollector) Collect(ch chan<- prometheus.Metric) {
-	c.volumeMu.Lock()
-	defer c.volumeMu.Unlock()
-	for device, value := range c.volume {
-		ch <- prometheus.MustNewConstMetric(
-			c.volumeDesc,
-			prometheus.CounterValue,
-			value,
-			device.Host(),
-			device.EOJ().String(),
-		)
-	}
-}
-
-func (c *WaterFlowMeterCollector) collectLoop(ctx context.Context, targets []echonetlite.Device) {
-	ticker := time.NewTicker(c.interval)
-	defer ticker.Stop()
-
-	c.collect(ctx, targets)
-	for {
-		select {
-		case <-ticker.C:
-			c.collect(ctx, targets)
-		case <-ctx.Done():
-			return
-		}
-	}
-}
-
-func (c *WaterFlowMeterCollector) collect(ctx context.Context, devices []echonetlite.Device) {
-	for _, device := range devices {
-		if ctx.Err() != nil {
-			return
-		}
-		reqCtx, cancel := context.WithTimeout(ctx, c.timeout)
-		reading, err := c.client.Get(reqCtx, device.Host(), device.EOJ())
-		cancel()
-
-		if err != nil {
-			c.collectMetrics.SetSuccess(device.Host(), device.EOJ().String(), false)
-			slog.Warn("failed to collect stats", "host", device.Host(), "eoj", device.EOJ().String(), "err", err)
-			continue
-		}
-		c.collectMetrics.SetSuccess(device.Host(), device.EOJ().String(), true)
-		c.updateMetrics(device, reading)
-	}
-}
-
-func (c *WaterFlowMeterCollector) updateMetrics(device echonetlite.Device, reading *echonetlite.WaterFlowMeter) {
-	cubicMeters := float64(reading.CumulativeFlowingWater) * reading.UnitForCumulativeFlowingWater
-	c.volumeMu.Lock()
-	c.volume[device] = cubicMeters
-	c.volumeMu.Unlock()
 }

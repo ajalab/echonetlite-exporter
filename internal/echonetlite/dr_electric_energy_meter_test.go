@@ -1,184 +1,114 @@
 package echonetlite
 
 import (
-	"context"
-	"net"
+	"reflect"
 	"testing"
 )
 
-func TestParseDRElectricEnergyMeterUnit(t *testing.T) {
-	if got := parseDRElectricEnergyMeterUnit([]byte{0x00}); got != 1.0 {
-		t.Fatalf("expected 1.0, got %f", got)
+func TestDRElectricEnergyMeterGet(t *testing.T) {
+	eoj := EOJ{0x02, 0x8E, 0x01}
+	input := testProperty(0xE0, 0, 0, 0, 100)
+	output := testProperty(0xE2, 0, 0, 0, 200)
+	unit := testProperty(0xD4, 0x01)
+	for _, tc := range []struct {
+		name      string
+		readable  []byte
+		exchanges []propertyExchange
+		want      *DRElectricEnergyMeter
+	}{
+		{
+			name:     "input only with optional NoData",
+			readable: []byte{0x9F, 0xD4, 0xE0, 0xE4, 0xE9, 0xEA},
+			exchanges: []propertyExchange{
+				{[]uint8{0xD4}, 0x72, []Property{unit}},
+				{[]uint8{0xE0, 0xE4, 0xE9, 0xEA}, 0x72, []Property{
+					input, testProperty(0xE4, 0xFF, 0xFF, 0xFF, 0xFE),
+					testProperty(0xE9, 0x7F, 0xFF, 0xFF, 0xFE), testProperty(0xEA, 0x7F, 0xFF, 0xFF, 0xFE),
+				}},
+			},
+			want: &DRElectricEnergyMeter{
+				CumulativeAmountsOfElectricEnergyUnit: 0.1,
+				ACInputCumulativeElectricEnergy:       new(uint32(100)),
+			},
+		},
+		{
+			name:     "output only with optional partial SNA",
+			readable: []byte{0x9F, 0xD4, 0xE2, 0xE9, 0xEA},
+			exchanges: []propertyExchange{
+				{[]uint8{0xD4}, 0x72, []Property{unit}},
+				{[]uint8{0xE2, 0xE9, 0xEA}, 0x52, []Property{output, testProperty(0xE9, 0xFF, 0xFF, 0xFF, 0x9C), testProperty(0xEA)}},
+			},
+			want: &DRElectricEnergyMeter{
+				CumulativeAmountsOfElectricEnergyUnit: 0.1,
+				ACOutputCumulativeElectricEnergy:      new(uint32(200)),
+				ACInstantaneousElectricPower:          new(int32(-100)),
+			},
+		},
+		{
+			name:     "both directions",
+			readable: []byte{0x9F, 0xD4, 0xE0, 0xE2},
+			exchanges: []propertyExchange{
+				{[]uint8{0xD4}, 0x72, []Property{unit}},
+				{[]uint8{0xE0, 0xE2}, 0x72, []Property{input, output}},
+			},
+			want: &DRElectricEnergyMeter{
+				CumulativeAmountsOfElectricEnergyUnit: 0.1,
+				ACInputCumulativeElectricEnergy:       new(uint32(100)),
+				ACOutputCumulativeElectricEnergy:      new(uint32(200)),
+			},
+		},
+		{
+			name:     "neither direction",
+			readable: []byte{0x9F, 0xD4, 0xEA},
+		},
+		{
+			name:     "missing output from a meter that advertised it",
+			readable: []byte{0x9F, 0xD4, 0xE0, 0xE2},
+			exchanges: []propertyExchange{
+				{[]uint8{0xD4}, 0x72, []Property{unit}},
+				{[]uint8{0xE0, 0xE2}, 0x52, []Property{input, testProperty(0xE2)}},
+			},
+		},
+		{
+			name:     "invalid unit",
+			readable: []byte{0x9F, 0xD4, 0xE0},
+			exchanges: []propertyExchange{
+				{[]uint8{0xD4}, 0x72, []Property{testProperty(0xD4, 0x05)}},
+			},
+		},
+		{
+			name:     "invalid required energy",
+			readable: []byte{0x9F, 0xD4, 0xE0},
+			exchanges: []propertyExchange{
+				{[]uint8{0xD4}, 0x72, []Property{unit}},
+				{[]uint8{0xE0}, 0x72, []Property{testProperty(0xE0, 0xFF, 0xFF, 0xFF, 0xFE)}},
+			},
+		},
+		{
+			name:     "invalid optional energy",
+			readable: []byte{0x9F, 0xD4, 0xE0, 0xE4},
+			exchanges: []propertyExchange{
+				{[]uint8{0xD4}, 0x72, []Property{unit}},
+				{[]uint8{0xE0, 0xE4}, 0x72, []Property{input, testProperty(0xE4, 0x3B, 0x9A, 0xCA, 0x00)}},
+			},
+		},
+		{
+			name:     "invalid optional power",
+			readable: []byte{0x9F, 0xD4, 0xE0, 0xE9},
+			exchanges: []propertyExchange{
+				{[]uint8{0xD4}, 0x72, []Property{unit}},
+				{[]uint8{0xE0, 0xE9}, 0x72, []Property{input, testProperty(0xE9, 1)}},
+			},
+		},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			mapEDT := append([]byte{byte(len(tc.readable))}, tc.readable...)
+			exchanges := append([]propertyExchange{{[]uint8{0x9F}, 0x72, []Property{testProperty(0x9F, mapEDT...)}}}, tc.exchanges...)
+			conn := newPropertyTestConnection(t, eoj, exchanges...)
+			got, err := NewDRElectricEnergyMeterClient(conn).Get(t.Context(), "127.0.0.1", eoj)
+			if (err == nil) != (tc.want != nil) || !reflect.DeepEqual(got, tc.want) {
+				t.Fatalf("Get = (%+v, %v), want %+v", got, err, tc.want)
+			}
+		})
 	}
-	if got := parseDRElectricEnergyMeterUnit([]byte{0x02}); got != 0.01 {
-		t.Fatalf("expected 0.01, got %f", got)
-	}
-	if got := parseDRElectricEnergyMeterUnit([]byte{0x0A}); got != 10.0 {
-		t.Fatalf("expected 10.0, got %f", got)
-	}
-	if got := parseDRElectricEnergyMeterUnit([]byte{0xFF}); got != 1.0 {
-		t.Fatalf("expected default 1.0, got %f", got)
-	}
-}
-
-func TestParseDRElectricEnergyMeterCumulative(t *testing.T) {
-	val, err := parseDRElectricEnergyMeterCumulative([]byte{0x00, 0x00, 0x00, 0x64})
-	if err != nil {
-		t.Fatalf("unexpected error: %v", err)
-	}
-	if val != 100 {
-		t.Fatalf("expected 100, got %d", val)
-	}
-	if _, err := parseDRElectricEnergyMeterCumulative([]byte{0x00}); err == nil {
-		t.Fatal("expected invalid length error")
-	}
-}
-
-func TestParseDRElectricEnergyMeterCumulativeWithNoData(t *testing.T) {
-	val, err := parseDRElectricEnergyMeterCumulativeWithNoData([]byte{0x00, 0x00, 0x00, 0x64})
-	if err != nil {
-		t.Fatalf("unexpected error: %v", err)
-	}
-	if val != 100 {
-		t.Fatalf("expected 100, got %d", val)
-	}
-	if _, err := parseDRElectricEnergyMeterCumulativeWithNoData([]byte{0xFF, 0xFF, 0xFF, 0xFE}); err == nil {
-		t.Fatal("expected no data error")
-	}
-}
-
-func TestParseDRElectricEnergyMeterInstantaneousPowerWithNoData(t *testing.T) {
-	val, err := parseDRElectricEnergyMeterInstantaneousPowerWithNoData([]byte{0x00, 0x00, 0x00, 0x64})
-	if err != nil {
-		t.Fatalf("unexpected error: %v", err)
-	}
-	if val != 100 {
-		t.Fatalf("expected 100, got %d", val)
-	}
-	val, err = parseDRElectricEnergyMeterInstantaneousPowerWithNoData([]byte{0xFF, 0xFF, 0xFF, 0x9C})
-	if err != nil {
-		t.Fatalf("unexpected error: %v", err)
-	}
-	if val != -100 {
-		t.Fatalf("expected -100, got %d", val)
-	}
-	if _, err := parseDRElectricEnergyMeterInstantaneousPowerWithNoData([]byte{0x7F, 0xFF, 0xFF, 0xFE}); err == nil {
-		t.Fatal("expected no data error")
-	}
-}
-
-func TestDRElectricEnergyMeterGetParsesResponse(t *testing.T) {
-	client := newDRElectricEnergyMeterTestClient(t, []Property{
-		{EPC: epcDRElectricEnergyMeterCumulativeAmountsOfElectricEnergyUnit, EDT: []byte{0x02}},
-		{EPC: epcDRElectricEnergyMeterACInputCumulativeElectricEnergy, EDT: []byte{0x00, 0x00, 0x00, 0x0A}},
-		{EPC: epcDRElectricEnergyMeterACOutputCumulativeElectricEnergy, EDT: []byte{0x00, 0x00, 0x00, 0x14}},
-		{EPC: epcDRElectricEnergyMeterIndependentOperationCumulativeElectricEnergy, EDT: []byte{0x00, 0x00, 0x00, 0x1E}},
-		{EPC: epcDRElectricEnergyMeterACInstantaneousElectricPower, EDT: []byte{0xFF, 0xFF, 0xFF, 0x9C}},
-		{EPC: epcDRElectricEnergyMeterIndependentOperationInstantaneousElectricPower, EDT: []byte{0x00, 0x00, 0x00, 0x64}},
-	})
-
-	m, err := client.Get(context.Background(), "127.0.0.1", EOJ{0x02, 0x8E, 0x01})
-	if err != nil {
-		t.Fatalf("Get failed: %v", err)
-	}
-	if m.CumulativeAmountsOfElectricEnergyUnit != 0.01 {
-		t.Fatalf("expected D4=0.01, got %f", m.CumulativeAmountsOfElectricEnergyUnit)
-	}
-	if m.ACInputCumulativeElectricEnergy != 10 {
-		t.Fatalf("expected E0=10, got %d", m.ACInputCumulativeElectricEnergy)
-	}
-	if m.ACOutputCumulativeElectricEnergy != 20 {
-		t.Fatalf("expected E2=20, got %d", m.ACOutputCumulativeElectricEnergy)
-	}
-	if m.IndependentOperationCumulativeElectricEnergy != 30 {
-		t.Fatalf("expected E4=30, got %d", m.IndependentOperationCumulativeElectricEnergy)
-	}
-	if m.ACInstantaneousElectricPower != -100 {
-		t.Fatalf("expected E9=-100, got %d", m.ACInstantaneousElectricPower)
-	}
-	if m.IndependentOperationInstantaneousElectricPower != 100 {
-		t.Fatalf("expected EA=100, got %d", m.IndependentOperationInstantaneousElectricPower)
-	}
-}
-
-func TestDRElectricEnergyMeterGetFailsOnMissingPropertyCount(t *testing.T) {
-	client := newDRElectricEnergyMeterTestClient(t, []Property{
-		{EPC: epcDRElectricEnergyMeterCumulativeAmountsOfElectricEnergyUnit, EDT: []byte{0x00}},
-	})
-	if _, err := client.Get(context.Background(), "127.0.0.1", EOJ{0x02, 0x8E, 0x01}); err == nil {
-		t.Fatal("expected property count error")
-	}
-}
-
-func TestDRElectricEnergyMeterGetFailsOnInvalidLength(t *testing.T) {
-	client := newDRElectricEnergyMeterTestClient(t, []Property{
-		{EPC: epcDRElectricEnergyMeterCumulativeAmountsOfElectricEnergyUnit, EDT: []byte{0x00}},
-		{EPC: epcDRElectricEnergyMeterACInputCumulativeElectricEnergy, EDT: []byte{0x00, 0x00, 0x00, 0x01}},
-		{EPC: epcDRElectricEnergyMeterACOutputCumulativeElectricEnergy, EDT: []byte{0x00}},
-		{EPC: epcDRElectricEnergyMeterIndependentOperationCumulativeElectricEnergy, EDT: []byte{0x00, 0x00, 0x00, 0x01}},
-		{EPC: epcDRElectricEnergyMeterACInstantaneousElectricPower, EDT: []byte{0x00, 0x00, 0x00, 0x01}},
-		{EPC: epcDRElectricEnergyMeterIndependentOperationInstantaneousElectricPower, EDT: []byte{0x00, 0x00, 0x00, 0x01}},
-	})
-	if _, err := client.Get(context.Background(), "127.0.0.1", EOJ{0x02, 0x8E, 0x01}); err == nil {
-		t.Fatal("expected invalid length error")
-	}
-}
-
-func TestDRElectricEnergyMeterGetFailsOnUnexpectedEPC(t *testing.T) {
-	client := newDRElectricEnergyMeterTestClient(t, []Property{
-		{EPC: epcDRElectricEnergyMeterCumulativeAmountsOfElectricEnergyUnit, EDT: []byte{0x00}},
-		{EPC: epcDRElectricEnergyMeterACInputCumulativeElectricEnergy, EDT: []byte{0x00, 0x00, 0x00, 0x01}},
-		{EPC: epcDRElectricEnergyMeterACOutputCumulativeElectricEnergy, EDT: []byte{0x00, 0x00, 0x00, 0x01}},
-		{EPC: epcDRElectricEnergyMeterIndependentOperationCumulativeElectricEnergy, EDT: []byte{0x00, 0x00, 0x00, 0x01}},
-		{EPC: 0xEE, EDT: []byte{0x00, 0x00, 0x00, 0x01}},
-		{EPC: epcDRElectricEnergyMeterIndependentOperationInstantaneousElectricPower, EDT: []byte{0x00, 0x00, 0x00, 0x01}},
-	})
-	if _, err := client.Get(context.Background(), "127.0.0.1", EOJ{0x02, 0x8E, 0x01}); err == nil {
-		t.Fatal("expected unexpected EPC error")
-	}
-}
-
-func TestDRElectricEnergyMeterGetFailsOnNoDataSentinel(t *testing.T) {
-	client := newDRElectricEnergyMeterTestClient(t, []Property{
-		{EPC: epcDRElectricEnergyMeterCumulativeAmountsOfElectricEnergyUnit, EDT: []byte{0x00}},
-		{EPC: epcDRElectricEnergyMeterACInputCumulativeElectricEnergy, EDT: []byte{0x00, 0x00, 0x00, 0x01}},
-		{EPC: epcDRElectricEnergyMeterACOutputCumulativeElectricEnergy, EDT: []byte{0x00, 0x00, 0x00, 0x01}},
-		{EPC: epcDRElectricEnergyMeterIndependentOperationCumulativeElectricEnergy, EDT: []byte{0xFF, 0xFF, 0xFF, 0xFE}},
-		{EPC: epcDRElectricEnergyMeterACInstantaneousElectricPower, EDT: []byte{0x00, 0x00, 0x00, 0x01}},
-		{EPC: epcDRElectricEnergyMeterIndependentOperationInstantaneousElectricPower, EDT: []byte{0x00, 0x00, 0x00, 0x01}},
-	})
-	if _, err := client.Get(context.Background(), "127.0.0.1", EOJ{0x02, 0x8E, 0x01}); err == nil {
-		t.Fatal("expected no data error")
-	}
-}
-
-func newDRElectricEnergyMeterTestClient(t *testing.T, responseProperties []Property) *DRElectricEnergyMeterClient {
-	t.Helper()
-
-	conn := &Connection{}
-	stub := &stubPacketConn{}
-	conn.conn = stub
-
-	stub.writeToFunc = func(packet []byte, addr net.Addr) (int, error) {
-		frame, err := Deserialize(packet)
-		if err != nil {
-			t.Fatalf("Deserialize failed: %v", err)
-		}
-
-		res := &Frame{
-			TID:        frame.TID,
-			SEOJ:       frame.DEOJ,
-			DEOJ:       frame.SEOJ,
-			ESV:        0x72,
-			Properties: responseProperties,
-		}
-		ch, ok := conn.pending.Load(frame.TID)
-		if !ok {
-			t.Fatalf("pending channel not found for tid=%d", frame.TID)
-		}
-		ch.(chan FrameAddr) <- FrameAddr{Frame: res, Addr: addr}
-		return len(packet), nil
-	}
-
-	return NewDRElectricEnergyMeterClient(conn)
 }

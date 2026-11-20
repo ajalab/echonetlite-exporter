@@ -2,19 +2,17 @@ package echonetlite
 
 import (
 	"context"
-	"encoding/binary"
 	"fmt"
+	"time"
 )
 
 const (
-	epcDRElectricEnergyMeterCumulativeAmountsOfElectricEnergyUnit                 = 0xD4
-	epcDRElectricEnergyMeterACInputCumulativeElectricEnergy                       = 0xE0
-	epcDRElectricEnergyMeterACOutputCumulativeElectricEnergy                      = 0xE2
-	epcDRElectricEnergyMeterIndependentOperationCumulativeElectricEnergy          = 0xE4
-	epcDRElectricEnergyMeterACInstantaneousElectricPower                          = 0xE9
-	epcDRElectricEnergyMeterIndependentOperationInstantaneousElectricPower        = 0xEA
-	drElectricEnergyMeterNoDataCumulative                                  uint32 = 0xFFFFFFFE
-	drElectricEnergyMeterNoDataInstantaneous                               int32  = 0x7FFFFFFE
+	epcDRElectricEnergyMeterCumulativeAmountsOfElectricEnergyUnit          = 0xD4
+	epcDRElectricEnergyMeterACInputCumulativeElectricEnergy                = 0xE0
+	epcDRElectricEnergyMeterACOutputCumulativeElectricEnergy               = 0xE2
+	epcDRElectricEnergyMeterIndependentOperationCumulativeElectricEnergy   = 0xE4
+	epcDRElectricEnergyMeterACInstantaneousElectricPower                   = 0xE9
+	epcDRElectricEnergyMeterIndependentOperationInstantaneousElectricPower = 0xEA
 )
 
 type DRElectricEnergyMeterClient struct {
@@ -25,138 +23,80 @@ func NewDRElectricEnergyMeterClient(conn *Connection) *DRElectricEnergyMeterClie
 	return &DRElectricEnergyMeterClient{conn: conn}
 }
 
+type DRElectricEnergyMeter struct {
+	CumulativeAmountsOfElectricEnergyUnit float64 // kWh per count
+
+	// At least one AC energy direction is supported. Every supported direction is required.
+	ACInputCumulativeElectricEnergy  *uint32
+	ACOutputCumulativeElectricEnergy *uint32
+
+	// These are optional. A valid NoData code also leaves the property absent.
+	IndependentOperationCumulativeElectricEnergy   *uint32
+	ACInstantaneousElectricPower                   *int32
+	IndependentOperationInstantaneousElectricPower *int32
+}
+
 func (c *DRElectricEnergyMeterClient) Get(ctx context.Context, host string, eoj EOJ) (*DRElectricEnergyMeter, error) {
-	getReq := Frame{
-		SEOJ: EOJ{0x05, 0xFF, 0x01},
-		DEOJ: eoj,
-		ESV:  0x62,
-		Properties: []Property{
-			{EPC: epcDRElectricEnergyMeterCumulativeAmountsOfElectricEnergyUnit, EDT: []byte{}},
-			{EPC: epcDRElectricEnergyMeterACInputCumulativeElectricEnergy, EDT: []byte{}},
-			{EPC: epcDRElectricEnergyMeterACOutputCumulativeElectricEnergy, EDT: []byte{}},
-			{EPC: epcDRElectricEnergyMeterIndependentOperationCumulativeElectricEnergy, EDT: []byte{}},
-			{EPC: epcDRElectricEnergyMeterACInstantaneousElectricPower, EDT: []byte{}},
-			{EPC: epcDRElectricEnergyMeterIndependentOperationInstantaneousElectricPower, EDT: []byte{}},
-		},
-	}
-	resFrame, err := c.conn.Unicast(ctx, host, getReq)
+	read := propertyReader{conn: c.conn, host: host, eoj: eoj, minimumWait: 20 * time.Second}
+	supported, err := read.readableProperties(ctx)
 	if err != nil {
 		return nil, err
 	}
-	if len(resFrame.Properties) != len(getReq.Properties) {
-		return nil, fmt.Errorf("unexpected property count: got %d, want %d", len(resFrame.Properties), len(getReq.Properties))
+	required := supportedEPCs(supported, epcDRElectricEnergyMeterACInputCumulativeElectricEnergy, epcDRElectricEnergyMeterACOutputCumulativeElectricEnergy)
+	if len(required) == 0 {
+		return nil, fmt.Errorf("Get property map lacks both AC energy directions (EPC 0xE0 and 0xE2)")
 	}
 
-	meter := &DRElectricEnergyMeter{}
-	for _, prop := range resFrame.Properties {
-		switch prop.EPC {
-		case epcDRElectricEnergyMeterCumulativeAmountsOfElectricEnergyUnit:
-			meter.CumulativeAmountsOfElectricEnergyUnit = parseDRElectricEnergyMeterUnit(prop.EDT)
-		case epcDRElectricEnergyMeterACInputCumulativeElectricEnergy:
-			val, err := parseDRElectricEnergyMeterCumulative(prop.EDT)
-			if err != nil {
-				return nil, fmt.Errorf("invalid acInputCumulativeElectricEnergy data: %w", err)
-			}
-			meter.ACInputCumulativeElectricEnergy = val
-		case epcDRElectricEnergyMeterACOutputCumulativeElectricEnergy:
-			val, err := parseDRElectricEnergyMeterCumulative(prop.EDT)
-			if err != nil {
-				return nil, fmt.Errorf("invalid acOutputCumulativeElectricEnergy data: %w", err)
-			}
-			meter.ACOutputCumulativeElectricEnergy = val
-		case epcDRElectricEnergyMeterIndependentOperationCumulativeElectricEnergy:
-			val, err := parseDRElectricEnergyMeterCumulativeWithNoData(prop.EDT)
-			if err != nil {
-				return nil, fmt.Errorf("invalid independentOperationCumulativeElectricEnergy data: %w", err)
-			}
-			meter.IndependentOperationCumulativeElectricEnergy = val
-		case epcDRElectricEnergyMeterACInstantaneousElectricPower:
-			val, err := parseDRElectricEnergyMeterInstantaneousPowerWithNoData(prop.EDT)
-			if err != nil {
-				return nil, fmt.Errorf("invalid acInstantaneousElectricPower data: %w", err)
-			}
-			meter.ACInstantaneousElectricPower = val
-		case epcDRElectricEnergyMeterIndependentOperationInstantaneousElectricPower:
-			val, err := parseDRElectricEnergyMeterInstantaneousPowerWithNoData(prop.EDT)
-			if err != nil {
-				return nil, fmt.Errorf("invalid independentOperationInstantaneousElectricPower data: %w", err)
-			}
-			meter.IndependentOperationInstantaneousElectricPower = val
-		default:
-			return nil, fmt.Errorf("unexpected EPC: 0x%X", prop.EPC)
-		}
-	}
-
-	return meter, nil
-}
-
-type DRElectricEnergyMeter struct {
-	CumulativeAmountsOfElectricEnergyUnit float32
-
-	ACInputCumulativeElectricEnergy uint32
-
-	ACOutputCumulativeElectricEnergy uint32
-
-	IndependentOperationCumulativeElectricEnergy uint32
-
-	ACInstantaneousElectricPower int32
-
-	IndependentOperationInstantaneousElectricPower int32
-}
-
-func parseDRElectricEnergyMeterUnit(edts []byte) float32 {
-	if len(edts) != 1 {
-		return 1.0
-	}
-	switch edts[0] {
-	case 0x00:
-		return 1.0
-	case 0x01:
-		return 0.1
-	case 0x02:
-		return 0.01
-	case 0x03:
-		return 0.001
-	case 0x04:
-		return 0.0001
-	case 0x0A:
-		return 10.0
-	case 0x0B:
-		return 100.0
-	case 0x0C:
-		return 1000.0
-	case 0x0D:
-		return 10000.0
-	default:
-		return 1.0
-	}
-}
-
-func parseDRElectricEnergyMeterCumulative(edts []byte) (uint32, error) {
-	if len(edts) != 4 {
-		return 0, fmt.Errorf("expected 4 bytes, got %d", len(edts))
-	}
-	return binary.BigEndian.Uint32(edts), nil
-}
-
-func parseDRElectricEnergyMeterCumulativeWithNoData(edts []byte) (uint32, error) {
-	val, err := parseDRElectricEnergyMeterCumulative(edts)
+	// AIF §3.1.4 lists D4 as an attribute. §3.2.1 groups the current values.
+	unitValues, err := read.required(ctx, epcDRElectricEnergyMeterCumulativeAmountsOfElectricEnergyUnit)
 	if err != nil {
-		return 0, err
+		return nil, err
 	}
-	if val == drElectricEnergyMeterNoDataCumulative {
-		return 0, fmt.Errorf("no data")
+	unit, err := decodeElectricEnergyUnit(unitValues[epcDRElectricEnergyMeterCumulativeAmountsOfElectricEnergyUnit])
+	if err != nil {
+		return nil, fmt.Errorf("cumulativeAmountsOfElectricEnergyUnit (EPC 0xD4): %w", err)
 	}
-	return val, nil
-}
+	values, err := read.group(ctx, required, supportedEPCs(supported,
+		epcDRElectricEnergyMeterIndependentOperationCumulativeElectricEnergy, epcDRElectricEnergyMeterACInstantaneousElectricPower, epcDRElectricEnergyMeterIndependentOperationInstantaneousElectricPower))
+	if err != nil {
+		return nil, err
+	}
 
-func parseDRElectricEnergyMeterInstantaneousPowerWithNoData(edts []byte) (int32, error) {
-	if len(edts) != 4 {
-		return 0, fmt.Errorf("expected 4 bytes, got %d", len(edts))
+	reading := &DRElectricEnergyMeter{CumulativeAmountsOfElectricEnergyUnit: unit}
+	for _, field := range []struct {
+		epc  uint8
+		dest **uint32
+	}{
+		{epcDRElectricEnergyMeterACInputCumulativeElectricEnergy, &reading.ACInputCumulativeElectricEnergy},
+		{epcDRElectricEnergyMeterACOutputCumulativeElectricEnergy, &reading.ACOutputCumulativeElectricEnergy},
+		{epcDRElectricEnergyMeterIndependentOperationCumulativeElectricEnergy, &reading.IndependentOperationCumulativeElectricEnergy},
+	} {
+		edt := values[field.epc]
+		if len(edt) == 0 || (field.epc == epcDRElectricEnergyMeterIndependentOperationCumulativeElectricEnergy && isNoData(edt, noEnergyData)) {
+			continue
+		}
+		value, err := decodeMeterValue(edt, 999_999_999)
+		if err != nil {
+			return nil, fmt.Errorf("DR meter energy (EPC 0x%02X): %w", field.epc, err)
+		}
+		*field.dest = &value
 	}
-	val := int32(binary.BigEndian.Uint32(edts))
-	if val == drElectricEnergyMeterNoDataInstantaneous {
-		return 0, fmt.Errorf("no data")
+	for _, field := range []struct {
+		epc  uint8
+		dest **int32
+	}{
+		{epcDRElectricEnergyMeterACInstantaneousElectricPower, &reading.ACInstantaneousElectricPower},
+		{epcDRElectricEnergyMeterIndependentOperationInstantaneousElectricPower, &reading.IndependentOperationInstantaneousElectricPower},
+	} {
+		edt := values[field.epc]
+		if len(edt) == 0 || isNoData(edt, noPowerData) {
+			continue
+		}
+		value, err := decodeElectricPower(edt)
+		if err != nil {
+			return nil, fmt.Errorf("DR meter power (EPC 0x%02X): %w", field.epc, err)
+		}
+		*field.dest = &value
 	}
-	return val, nil
+	return reading, nil
 }

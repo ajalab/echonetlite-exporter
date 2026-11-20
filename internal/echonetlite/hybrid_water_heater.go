@@ -4,6 +4,8 @@ import (
 	"context"
 	"encoding/binary"
 	"fmt"
+	"maps"
+	"time"
 )
 
 const (
@@ -33,46 +35,74 @@ func NewHybridWaterHeaterClient(conn *Connection) *HybridWaterHeaterClient {
 }
 
 func (c *HybridWaterHeaterClient) Get(ctx context.Context, host string, eoj EOJ) (*HybridWaterHeater, error) {
-	supported, err := getReadableProperties(ctx, c.conn, host, eoj)
+	read := propertyReader{conn: c.conn, host: host, eoj: eoj, minimumWait: 10 * time.Second}
+	supported, err := read.readableProperties(ctx)
 	if err != nil {
 		return nil, err
 	}
 
 	// AIF §3.1.4 allows these device properties to be read together.
-	var optionalGroup []uint8
-	for _, epc := range []uint8{epcWaterHeatingStatus, epcHotWaterSupplyStatus} {
-		if supported[epc] {
-			optionalGroup = append(optionalGroup, epc)
-		}
-	}
-	values, err := getPropertyGroup(ctx, c.conn, host, eoj,
-		[]uint8{epcLinkageModeForSolarPowerGeneration}, optionalGroup...)
+	values, err := read.group(ctx, []uint8{epcLinkageModeForSolarPowerGeneration},
+		supportedEPCs(supported, epcWaterHeatingStatus, epcHotWaterSupplyStatus))
 	if err != nil {
 		return nil, err
 	}
-	linkageMode := decodeByte(values[epcLinkageModeForSolarPowerGeneration], 0x41, 0x44)
-	if linkageMode == nil {
-		return nil, fmt.Errorf("invalid linkageModeForSolarPowerGeneration: %X", values[epcLinkageModeForSolarPowerGeneration])
+	linkageMode, err := decodeByte(values[epcLinkageModeForSolarPowerGeneration], 0x41, 0x44)
+	if err != nil {
+		return nil, fmt.Errorf("linkageModeForSolarPowerGeneration (EPC 0xB8): %w", err)
 	}
-	optional := getOptionalPropertiesIndividually(ctx, c.conn, host, eoj, supported,
-		epcHeaterStatus, epcRemainingWater, epcTankCapacity)
-	return &HybridWaterHeater{
-		LinkageModeForSolarPowerGeneration: *linkageMode,
-		WaterHeatingStatus:                 decodeHeatingState(values[epcWaterHeatingStatus]),
-		HeaterStatus:                       decodeHeatingState(optional[epcHeaterStatus]),
-		HotWaterSupplyStatus:               decodeHeatingState(values[epcHotWaterSupplyStatus]),
-		RemainingWater:                     decodeWaterVolume(optional[epcRemainingWater]),
-		TankCapacity:                       decodeWaterVolume(optional[epcTankCapacity]),
-	}, nil
+	optional, err := read.optionalIndividually(ctx, supportedEPCs(supported,
+		epcHeaterStatus, epcRemainingWater, epcTankCapacity))
+	if err != nil {
+		return nil, err
+	}
+	maps.Copy(values, optional)
+	reading := &HybridWaterHeater{LinkageModeForSolarPowerGeneration: linkageMode}
+	for _, field := range []struct {
+		epc  uint8
+		dest **bool
+	}{
+		{epcWaterHeatingStatus, &reading.WaterHeatingStatus},
+		{epcHeaterStatus, &reading.HeaterStatus},
+		{epcHotWaterSupplyStatus, &reading.HotWaterSupplyStatus},
+	} {
+		edt := values[field.epc]
+		if len(edt) == 0 {
+			continue
+		}
+		value, err := decodeHeatingState(edt)
+		if err != nil {
+			return nil, fmt.Errorf("heating state (EPC 0x%02X): %w", field.epc, err)
+		}
+		*field.dest = &value
+	}
+	for _, field := range []struct {
+		epc  uint8
+		dest **uint16
+	}{
+		{epcRemainingWater, &reading.RemainingWater},
+		{epcTankCapacity, &reading.TankCapacity},
+	} {
+		edt := values[field.epc]
+		if len(edt) == 0 {
+			continue
+		}
+		value, err := decodeWaterVolume(edt)
+		if err != nil {
+			return nil, fmt.Errorf("water volume (EPC 0x%02X): %w", field.epc, err)
+		}
+		*field.dest = &value
+	}
+	return reading, nil
 }
 
-func decodeWaterVolume(edt []byte) *uint16 {
+func decodeWaterVolume(edt []byte) (uint16, error) {
 	if len(edt) != 2 {
-		return nil
+		return 0, fmt.Errorf("expected 2 bytes, got %d", len(edt))
 	}
 	value := binary.BigEndian.Uint16(edt)
 	if value > 0xFFFD {
-		return nil
+		return 0, fmt.Errorf("water volume out of range: %d", value)
 	}
-	return &value
+	return value, nil
 }

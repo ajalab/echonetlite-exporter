@@ -25,8 +25,8 @@ func NewWaterFlowMeterClient(conn *Connection) *WaterFlowMeterClient {
 }
 
 func (c *WaterFlowMeterClient) Get(ctx context.Context, host string, eoj EOJ) (*WaterFlowMeter, error) {
-	values, err := getRequiredProperties(ctx, c.conn, host, eoj,
-		epcCumulativeFlowingWater, epcUnitForCumulativeFlowingWater)
+	read := propertyReader{conn: c.conn, host: host, eoj: eoj}
+	values, err := read.required(ctx, epcCumulativeFlowingWater, epcUnitForCumulativeFlowingWater)
 	if err != nil {
 		return nil, err
 	}
@@ -34,12 +34,12 @@ func (c *WaterFlowMeterClient) Get(ctx context.Context, host string, eoj EOJ) (*
 	if err != nil {
 		return nil, fmt.Errorf("invalid cumulativeFlowingWater: %w", err)
 	}
-	unit := decodeByte(values[epcUnitForCumulativeFlowingWater], 0x00, 0x06)
-	if unit == nil {
-		return nil, fmt.Errorf("invalid unitForCumulativeFlowingWater: %X", values[epcUnitForCumulativeFlowingWater])
+	unit, err := decodeByte(values[epcUnitForCumulativeFlowingWater], 0x00, 0x06)
+	if err != nil {
+		return nil, fmt.Errorf("unitForCumulativeFlowingWater (EPC 0xE1): %w", err)
 	}
 	return &WaterFlowMeter{
 		CumulativeFlowingWater:        volume,
-		UnitForCumulativeFlowingWater: math.Pow10(-int(*unit)),
+		UnitForCumulativeFlowingWater: math.Pow10(-int(unit)),
 	}, nil
 }

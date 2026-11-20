@@ -1,92 +1,55 @@
 package echonetlite
 
 import (
-	"context"
-	"net"
+	"slices"
 	"testing"
 )
 
-func TestParsePVInstantaneousPower(t *testing.T) {
-	val, err := parseInstantaneousElectricPowerGeneration([]byte{0x00, 0x64})
-	if err != nil {
-		t.Fatalf("unexpected error: %v", err)
+func TestPVPowerGenerationGet(t *testing.T) {
+	eoj := EOJ{0x02, 0x79, 0x01}
+	epcs := []uint8{0xE0, 0xE1}
+	response := []Property{
+		testProperty(0xE0, 0xFF, 0xFD),
+		testProperty(0xE1, 0, 0, 0, 200),
 	}
-	if val != 100 {
-		t.Fatalf("expected 100, got %d", val)
+	want := PVPowerGeneration{
+		InstantaneousElectricPowerGeneration: 65_533, CumulativeElectricEnergyOfGeneration: 200,
 	}
-	if _, err := parseInstantaneousElectricPowerGeneration([]byte{0x00}); err == nil {
-		t.Fatalf("expected error for invalid length")
-	}
-}
 
-func TestParsePVCumulativeEnergy(t *testing.T) {
-	val, err := parseCumulativeElectricEnergyOfGeneration([]byte{0x00, 0x00, 0x0F, 0xA0})
-	if err != nil {
-		t.Fatalf("unexpected error: %v", err)
-	}
-	if val != 4000 {
-		t.Fatalf("expected 4000, got %d", val)
-	}
-	if _, err := parseCumulativeElectricEnergyOfGeneration([]byte{0x00, 0x00, 0x0F}); err == nil {
-		t.Fatalf("expected error for invalid length")
-	}
-}
-
-func TestPVPowerGenerationGetParsesResponse(t *testing.T) {
-	client := newPVPowerGenerationTestClient(t, []Property{
-		{EPC: epcInstantaneousElectricPowerGeneration, EDT: []byte{0x00, 0x64}},
-		{EPC: epcCumulativeElectricEnergyOfGeneration, EDT: []byte{0x00, 0x00, 0x00, 0xC8}},
+	t.Run("success", func(t *testing.T) {
+		conn := newPropertyTestConnection(t, eoj, propertyExchange{epcs, 0x72, response})
+		got, err := NewPVPowerGenerationClient(conn).Get(t.Context(), "127.0.0.1", eoj)
+		if err != nil || got == nil || *got != want {
+			t.Fatalf("Get = (%+v, %v), want %+v", got, err, want)
+		}
 	})
 
-	pv, err := client.Get(context.Background(), "127.0.0.1", EOJ{0x02, 0x79, 0x01})
-	if err != nil {
-		t.Fatalf("Get failed: %v", err)
+	for _, tc := range []struct {
+		name     string
+		index    int
+		property Property
+	}{
+		{"short power", 0, testProperty(0xE0, 0)},
+		{"power overflow", 0, testProperty(0xE0, 0xFF, 0xFE)},
+		{"short energy", 1, testProperty(0xE1, 0, 0, 0)},
+		{"energy above max", 1, testProperty(0xE1, 0x3B, 0x9A, 0xCA, 0x00)},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			props := slices.Clone(response)
+			props[tc.index] = tc.property
+			conn := newPropertyTestConnection(t, eoj, propertyExchange{epcs, 0x72, props})
+			if got, err := NewPVPowerGenerationClient(conn).Get(t.Context(), "127.0.0.1", eoj); got != nil || err == nil {
+				t.Fatalf("Get = (%+v, %v), want an error and no reading", got, err)
+			}
+		})
 	}
-	if pv.InstantaneousElectricPowerGeneration != 100 {
-		t.Fatalf("expected E0=100, got %d", pv.InstantaneousElectricPowerGeneration)
-	}
-	if pv.CumulativeElectricEnergyOfGeneration != 200 {
-		t.Fatalf("expected E1=200, got %d", pv.CumulativeElectricEnergyOfGeneration)
-	}
-}
 
-func TestPVPowerGenerationGetFailsOnInvalidLength(t *testing.T) {
-	client := newPVPowerGenerationTestClient(t, []Property{
-		{EPC: epcInstantaneousElectricPowerGeneration, EDT: []byte{0x00}},
-		{EPC: epcCumulativeElectricEnergyOfGeneration, EDT: []byte{0x00, 0x00, 0x00, 0x64}},
+	t.Run("missing required property", func(t *testing.T) {
+		props := slices.Clone(response)
+		props[len(props)-1].EDT = nil
+		conn := newPropertyTestConnection(t, eoj, propertyExchange{epcs, 0x52, props})
+		if got, err := NewPVPowerGenerationClient(conn).Get(t.Context(), "127.0.0.1", eoj); got != nil || err == nil {
+			t.Fatalf("Get = (%+v, %v), want an error and no reading", got, err)
+		}
 	})
-	if _, err := client.Get(context.Background(), "127.0.0.1", EOJ{0x02, 0x79, 0x01}); err == nil {
-		t.Fatal("expected invalid length error")
-	}
-}
-
-func newPVPowerGenerationTestClient(t *testing.T, responseProperties []Property) *PVPowerGenerationClient {
-	t.Helper()
-
-	conn := &Connection{}
-	stub := &stubPacketConn{}
-	conn.conn = stub
-
-	stub.writeToFunc = func(packet []byte, addr net.Addr) (int, error) {
-		frame, err := Deserialize(packet)
-		if err != nil {
-			t.Fatalf("Deserialize failed: %v", err)
-		}
-
-		res := &Frame{
-			TID:        frame.TID,
-			SEOJ:       frame.DEOJ,
-			DEOJ:       frame.SEOJ,
-			ESV:        0x72,
-			Properties: responseProperties,
-		}
-		ch, ok := conn.pending.Load(frame.TID)
-		if !ok {
-			t.Fatalf("pending channel not found for tid=%d", frame.TID)
-		}
-		ch.(chan FrameAddr) <- FrameAddr{Frame: res, Addr: addr}
-		return len(packet), nil
-	}
-
-	return NewPVPowerGenerationClient(conn)
 }

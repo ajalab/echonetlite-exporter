@@ -2,155 +2,49 @@ package collector
 
 import (
 	"context"
-	"log/slog"
-	"sync"
 	"time"
 
 	"github.com/ajalab/echonetlite-exporter/internal/echonetlite"
 	"github.com/prometheus/client_golang/prometheus"
 )
 
+// MultipleInputPCSCollector collects and publishes metrics for its ECHONET Lite device class.
 type MultipleInputPCSCollector struct {
-	interval time.Duration
-	timeout  time.Duration
-	client   multipleInputPCSClient
-	targets  []echonetlite.Device
-
-	instantaneousElectricPowerGauge *prometheus.GaugeVec
-	normalDirectionEnergyDesc       *prometheus.Desc
-	normalDirectionEnergy           map[cumulativeMultipleInputPCSEnergyKey]float64
-	reverseDirectionEnergyDesc      *prometheus.Desc
-	reverseDirectionEnergy          map[cumulativeMultipleInputPCSEnergyKey]float64
-	metricsStateMu                  sync.Mutex
-	collectMetrics                  *CollectMetrics
+	*collector
 }
 
-type multipleInputPCSClient interface {
-	Get(ctx context.Context, host string, eoj echonetlite.EOJ) (*echonetlite.MultipleInputPCS, error)
-}
-
-type cumulativeMultipleInputPCSEnergyKey struct {
-	host string
-	eoj  string
-}
-
+// NewMultipleInputPCSCollector creates a MultipleInputPCSCollector.
 func NewMultipleInputPCSCollector(
-	client multipleInputPCSClient,
+	get func(context.Context, string, echonetlite.EOJ) (*echonetlite.MultipleInputPCS, error),
 	interval time.Duration,
-	timeout time.Duration,
-	collectMetrics *CollectMetrics,
 	targets []echonetlite.Device,
 ) *MultipleInputPCSCollector {
-	return &MultipleInputPCSCollector{
-		interval: interval,
-		timeout:  timeout,
-		client:   client,
-		targets:  targets,
-		instantaneousElectricPowerGauge: prometheus.NewGaugeVec(
-			prometheus.GaugeOpts{
-				Name: "echonetlite_multiple_input_pcs_electric_power_watts",
-				Help: "Measured instantaneous electric power.",
-			},
-			[]string{"host", "eoj"},
-		),
-		normalDirectionEnergyDesc: prometheus.NewDesc(
-			"echonetlite_multiple_input_pcs_normal_direction_electric_energy_joules_total",
-			"Cumulative electric energy in the normal direction.",
-			[]string{"host", "eoj"},
-			nil,
-		),
-		normalDirectionEnergy: make(map[cumulativeMultipleInputPCSEnergyKey]float64),
-		reverseDirectionEnergyDesc: prometheus.NewDesc(
-			"echonetlite_multiple_input_pcs_reverse_direction_electric_energy_joules_total",
-			"Cumulative electric energy in the reverse direction.",
-			[]string{"host", "eoj"},
-			nil,
-		),
-		reverseDirectionEnergy: make(map[cumulativeMultipleInputPCSEnergyKey]float64),
-		collectMetrics:         collectMetrics,
-	}
-}
-
-func (c *MultipleInputPCSCollector) Start(ctx context.Context) {
-	go c.collectLoop(ctx, c.targets)
-}
-
-func (c *MultipleInputPCSCollector) Describe(ch chan<- *prometheus.Desc) {
-	c.instantaneousElectricPowerGauge.Describe(ch)
-	ch <- c.normalDirectionEnergyDesc
-	ch <- c.reverseDirectionEnergyDesc
-}
-
-func (c *MultipleInputPCSCollector) Collect(ch chan<- prometheus.Metric) {
-	c.instantaneousElectricPowerGauge.Collect(ch)
-	c.metricsStateMu.Lock()
-	for key, value := range c.normalDirectionEnergy {
-		ch <- prometheus.MustNewConstMetric(
-			c.normalDirectionEnergyDesc,
-			prometheus.CounterValue,
-			value,
-			key.host,
-			key.eoj,
-		)
-	}
-	for key, value := range c.reverseDirectionEnergy {
-		ch <- prometheus.MustNewConstMetric(
-			c.reverseDirectionEnergyDesc,
-			prometheus.CounterValue,
-			value,
-			key.host,
-			key.eoj,
-		)
-	}
-	c.metricsStateMu.Unlock()
-}
-
-func (c *MultipleInputPCSCollector) collectLoop(ctx context.Context, targets []echonetlite.Device) {
-	ticker := time.NewTicker(c.interval)
-	defer ticker.Stop()
-
-	c.collect(ctx, targets)
-	for {
-		select {
-		case <-ticker.C:
-			c.collect(ctx, targets)
-		case <-ctx.Done():
-			return
-		}
-	}
-}
-
-func (c *MultipleInputPCSCollector) collect(ctx context.Context, devices []echonetlite.Device) {
-	for _, device := range devices {
-		reqCtx, cancel := context.WithTimeout(ctx, c.timeout)
-		props, err := c.client.Get(reqCtx, device.Host(), device.EOJ())
-		cancel()
-
-		if err != nil {
-			c.collectMetrics.SetSuccess(device.Host(), device.EOJ().String(), false)
-			slog.Warn("failed to collect stats", "host", device.Host(), "eoj", device.EOJ().String(), "err", err)
-			continue
-		}
-		c.collectMetrics.SetSuccess(device.Host(), device.EOJ().String(), true)
-
-		c.updateMetrics(device, props)
-	}
-}
-
-func (c *MultipleInputPCSCollector) updateMetrics(
-	device echonetlite.Device,
-	mipcs *echonetlite.MultipleInputPCS,
-) {
-	c.instantaneousElectricPowerGauge.WithLabelValues(device.Host(), device.EOJ().String()).Set(
-		float64(mipcs.InstantaneousElectricPower),
+	power := prometheus.NewDesc(
+		"echonetlite_multiple_input_pcs_electric_power_watts",
+		"Measured instantaneous electric power.",
+		deviceLabels, nil,
 	)
-
-	key := cumulativeMultipleInputPCSEnergyKey{
-		host: device.Host(),
-		eoj:  device.EOJ().String(),
+	normalEnergy := prometheus.NewDesc(
+		"echonetlite_multiple_input_pcs_normal_direction_electric_energy_joules_total",
+		"Measured cumulative amount of electric energy (normal direction).",
+		deviceLabels, nil,
+	)
+	reverseEnergy := prometheus.NewDesc(
+		"echonetlite_multiple_input_pcs_reverse_direction_electric_energy_joules_total",
+		"Measured cumulative amount of electric energy (reverse direction).",
+		deviceLabels, nil,
+	)
+	descs := []*prometheus.Desc{power, normalEnergy, reverseEnergy}
+	return &MultipleInputPCSCollector{
+		collector: newCollector(interval, targets, descs, get,
+			func(device echonetlite.Device, reading *echonetlite.MultipleInputPCS) []prometheus.Metric {
+				host, eoj := device.Host(), device.EOJ().String()
+				return []prometheus.Metric{
+					prometheus.MustNewConstMetric(power, prometheus.GaugeValue, float64(reading.InstantaneousElectricPower), host, eoj),
+					prometheus.MustNewConstMetric(normalEnergy, prometheus.CounterValue, float64(reading.NormalDirectionElectricEnergy)*joulesPerWattHour, host, eoj),
+					prometheus.MustNewConstMetric(reverseEnergy, prometheus.CounterValue, float64(reading.ReverseDirectionElectricEnergy)*joulesPerWattHour, host, eoj),
+				}
+			},
+		),
 	}
-	c.metricsStateMu.Lock()
-	c.normalDirectionEnergy[key] = float64(mipcs.NormalDirectionElectricEnergy) * 3600.0
-	c.reverseDirectionEnergy[key] = float64(mipcs.ReverseDirectionElectricEnergy) * 3600.0
-	c.metricsStateMu.Unlock()
 }
