@@ -16,149 +16,93 @@ type PowerDistributionBoardMeteringClient struct {
 }
 
 func NewPowerDistributionBoardMeteringClient(conn *Connection) *PowerDistributionBoardMeteringClient {
-	return &PowerDistributionBoardMeteringClient{
-		conn: conn,
-	}
-}
-
-func (p *PowerDistributionBoardMeteringClient) Get(ctx context.Context, host string, eoj EOJ) (*PowerDistributionBoardMetering, error) {
-	getReq := Frame{
-		SEOJ: EOJ{0x05, 0xFF, 0x01},
-		DEOJ: eoj,
-		ESV:  0x62,
-		Properties: []Property{
-			{EPC: epcCumulativeElectricEnergyListSimplex, EDT: []byte{}},
-			{EPC: epcInstantaneousElectricPowerListSimplex, EDT: []byte{}},
-			{EPC: epcUnitForCumulativeElectricEnergy, EDT: []byte{}},
-		},
-	}
-	resFrame, err := p.conn.Unicast(ctx, host, getReq)
-	if err != nil {
-		return nil, err
-	}
-	if len(resFrame.Properties) != len(getReq.Properties) {
-		return nil, fmt.Errorf("unexpected property count: got %d, want %d", len(resFrame.Properties), len(getReq.Properties))
-	}
-
-	var instantaneousElectricPowerListSimplex InstantaneousElectricPowerListSimplex
-	var cumulativeElectricEnergyListSimplex CumulativeElectricEnergyListSimplex
-	var unitForCumulativeEnergy float32
-	for _, p := range resFrame.Properties {
-		switch p.EPC {
-		case epcInstantaneousElectricPowerListSimplex:
-			instantaneousElectricPowerListSimplex = parseInstantaneousPowerListSimplex(p.EDT)
-		case epcCumulativeElectricEnergyListSimplex:
-			cumulativeElectricEnergyListSimplex = parseCumulativeElectricEnergyListSimplex(p.EDT)
-		case epcUnitForCumulativeElectricEnergy:
-			unitForCumulativeEnergy = parseUnitForCumulativeEnergy(p.EDT)
-		default:
-			return nil, fmt.Errorf("unexpected EPC: 0x%X", p.EPC)
-		}
-	}
-
-	return &PowerDistributionBoardMetering{
-		InstantaneousElectricPowerListSimplex: instantaneousElectricPowerListSimplex,
-		CumulativeElectricEnergyListSimplex:   cumulativeElectricEnergyListSimplex,
-		UnitForCumulativeEnergy:               unitForCumulativeEnergy,
-	}, nil
+	return &PowerDistributionBoardMeteringClient{conn: conn}
 }
 
 type PowerDistributionBoardMetering struct {
-	// This property indicates the measured cumulative amount of electric power
-	// consumption of a measurement channel specified by the property of 'Channel
-	// range specification for cumulative amount of electric power consumption
-	// measurement (simplex).
-	CumulativeElectricEnergyListSimplex CumulativeElectricEnergyListSimplex
-
-	// This property indicates the measured instantaneous power consumption of a
-	// measurement channel specified by the property of 'Channel range
-	// specification for instantaneous power consumption measurement (simplex).
+	CumulativeElectricEnergyListSimplex   CumulativeElectricEnergyListSimplex
 	InstantaneousElectricPowerListSimplex InstantaneousElectricPowerListSimplex
-
-	// This property indicates the unit (multiplying factor) used for the
-	// measured cumulative amount of electric energy and the historical data of
-	// measured cumulative amounts of electric energy.
-	UnitForCumulativeEnergy float32
+	UnitForCumulativeElectricEnergy       float64 // kWh per count
 }
 
 type InstantaneousElectricPowerListSimplex struct {
 	StartChannel               uint8
-	Range                      uint8
-	InstantaneousElectricPower []int32
-}
-
-func parseInstantaneousPowerListSimplex(edts []byte) InstantaneousElectricPowerListSimplex {
-	if len(edts) < 2 {
-		return InstantaneousElectricPowerListSimplex{}
-	}
-	startChannel := edts[0]
-	channelRange := edts[1]
-	valuesBytes := edts[2:]
-
-	var instantaneousPowerList []int32
-	for i := 0; i+4 <= len(valuesBytes); i += 4 {
-		val := int32(valuesBytes[i])<<24 | int32(valuesBytes[i+1])<<16 | int32(valuesBytes[i+2])<<8 | int32(valuesBytes[i+3])
-		instantaneousPowerList = append(instantaneousPowerList, val)
-	}
-	return InstantaneousElectricPowerListSimplex{
-		StartChannel:               startChannel,
-		Range:                      channelRange,
-		InstantaneousElectricPower: instantaneousPowerList,
-	}
+	InstantaneousElectricPower []*int32 // nil entries denote channels with NoData
 }
 
 type CumulativeElectricEnergyListSimplex struct {
 	StartChannel   uint8
-	Range          uint8
-	ElectricEnergy []int32
+	ElectricEnergy []*uint32 // nil entries denote channels with NoData
 }
 
-func parseCumulativeElectricEnergyListSimplex(edts []byte) CumulativeElectricEnergyListSimplex {
-	if len(edts) < 2 {
-		return CumulativeElectricEnergyListSimplex{}
+func (p *PowerDistributionBoardMeteringClient) Get(ctx context.Context, host string, eoj EOJ) (*PowerDistributionBoardMetering, error) {
+	read := propertyReader{conn: p.conn, host: host, eoj: eoj}
+	supported, err := read.readableProperties(ctx)
+	if err != nil {
+		return nil, err
 	}
-	startChannel := edts[0]
-	channelRange := edts[1]
-	valuesBytes := edts[2:]
+	unitValues, err := read.required(ctx, epcUnitForCumulativeElectricEnergy)
+	if err != nil {
+		return nil, err
+	}
+	unit, err := decodeElectricEnergyUnit(unitValues[epcUnitForCumulativeElectricEnergy])
+	if err != nil {
+		return nil, fmt.Errorf("unitForCumulativeElectricEnergy (EPC 0xC2): %w", err)
+	}
+	values, err := read.optionalIndividually(ctx, supportedEPCs(supported,
+		epcCumulativeElectricEnergyListSimplex, epcInstantaneousElectricPowerListSimplex))
+	if err != nil {
+		return nil, err
+	}
 
-	var energyList []int32
-	for i := 0; i+4 <= len(valuesBytes); i += 4 {
-		val := int32(valuesBytes[i])<<24 | int32(valuesBytes[i+1])<<16 | int32(valuesBytes[i+2])<<8 | int32(valuesBytes[i+3])
-		energyList = append(energyList, val)
+	reading := &PowerDistributionBoardMetering{UnitForCumulativeElectricEnergy: unit}
+	if edt := values[epcCumulativeElectricEnergyListSimplex]; len(edt) != 0 {
+		start, entries, err := decodeChannelList(edt, noEnergyData, decodeChannelEnergy)
+		if err != nil {
+			return nil, fmt.Errorf("cumulativeElectricEnergyListSimplex (EPC 0xB3): %w", err)
+		}
+		reading.CumulativeElectricEnergyListSimplex = CumulativeElectricEnergyListSimplex{StartChannel: start, ElectricEnergy: entries}
 	}
-	return CumulativeElectricEnergyListSimplex{
-		StartChannel:   startChannel,
-		Range:          channelRange,
-		ElectricEnergy: energyList,
+	if edt := values[epcInstantaneousElectricPowerListSimplex]; len(edt) != 0 {
+		start, entries, err := decodeChannelList(edt, noPowerData, decodeElectricPower)
+		if err != nil {
+			return nil, fmt.Errorf("instantaneousElectricPowerListSimplex (EPC 0xB7): %w", err)
+		}
+		reading.InstantaneousElectricPowerListSimplex = InstantaneousElectricPowerListSimplex{StartChannel: start, InstantaneousElectricPower: entries}
 	}
+	return reading, nil
 }
 
-func parseUnitForCumulativeEnergy(edts []byte) float32 {
-	{
-		if len(edts) != 1 {
-			return 1.0
-		}
-		switch edts[0] {
-		case 0x00:
-			return 1.0
-		case 0x01:
-			return 0.1
-		case 0x02:
-			return 0.01
-		case 0x03:
-			return 0.001
-		case 0x04:
-			return 0.0001
-		case 0x0A:
-			return 10.0
-		case 0x0B:
-			return 100.0
-		case 0x0C:
-			return 1000.0
-		case 0x0D:
-			return 10000.0
-		default:
-			return 1.0
-		}
+func decodeChannelEnergy(edt []byte) (uint32, error) {
+	return decodeMeterValue(edt, 99_999_999)
+}
+
+func decodeChannelList[T int32 | uint32](edt []byte, noData uint32, decode func([]byte) (T, error)) (uint8, []*T, error) {
+	if len(edt) < 2 {
+		return 0, nil, fmt.Errorf("missing channel range")
 	}
+	start, count := edt[0], int(edt[1])
+	// The Appendix specifies an unset range followed by one NoData entry at startup.
+	if start == 0xFD && count == 0xFD && isNoData(edt[2:], noData) {
+		return 0, nil, nil
+	}
+	if start == 0 || count < 1 || count > 60 || int(start)+count-1 > 252 {
+		return 0, nil, fmt.Errorf("invalid channel range: start %d, count %d", start, count)
+	}
+	if len(edt) != 2+4*count {
+		return 0, nil, fmt.Errorf("expected %d bytes for %d channels, got %d", 2+4*count, count, len(edt))
+	}
+	entries := make([]*T, count)
+	for i := range entries {
+		valueBytes := edt[2+4*i : 2+4*(i+1)]
+		if isNoData(valueBytes, noData) {
+			continue
+		}
+		value, err := decode(valueBytes)
+		if err != nil {
+			return 0, nil, fmt.Errorf("channel %d: %w", int(start)+i, err)
+		}
+		entries[i] = &value
+	}
+	return start, entries, nil
 }

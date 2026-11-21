@@ -20,7 +20,8 @@ func NewGasMeterClient(conn *Connection) *GasMeterClient {
 }
 
 func (c *GasMeterClient) Get(ctx context.Context, host string, eoj EOJ) (*GasMeter, error) {
-	values, err := getRequiredProperties(ctx, c.conn, host, eoj, epcCumulativeGasConsumption)
+	read := propertyReader{conn: c.conn, host: host, eoj: eoj}
+	values, err := read.required(ctx, epcCumulativeGasConsumption)
 	if err != nil {
 		return nil, err
 	}

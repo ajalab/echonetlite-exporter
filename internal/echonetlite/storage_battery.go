@@ -2,8 +2,8 @@ package echonetlite
 
 import (
 	"context"
-	"encoding/binary"
 	"fmt"
+	"time"
 )
 
 const (
@@ -24,58 +24,35 @@ func NewStorageBatteryClient(conn *Connection) *StorageBatteryClient {
 }
 
 func (s *StorageBatteryClient) Get(ctx context.Context, host string, eoj EOJ) (*StorageBattery, error) {
-	getReq := Frame{
-		SEOJ: EOJ{0x05, 0xFF, 0x01},
-		DEOJ: eoj,
-		ESV:  0x62,
-		Properties: []Property{
-			{EPC: epcACChargeableElectricEnergy, EDT: []byte{}},
-			{EPC: epcACDischargeableElectricEnergy, EDT: []byte{}},
-			{EPC: epcACCumulativeChargingElectricEnergy, EDT: []byte{}},
-			{EPC: epcACCumulativeDischargingElectricEnergy, EDT: []byte{}},
-		},
-	}
-	resFrame, err := s.conn.Unicast(ctx, host, getReq)
+	read := propertyReader{conn: s.conn, host: host, eoj: eoj, minimumWait: 20 * time.Second}
+	values, err := read.required(ctx,
+		epcACChargeableElectricEnergy,
+		epcACDischargeableElectricEnergy,
+		epcACCumulativeChargingElectricEnergy,
+		epcACCumulativeDischargingElectricEnergy,
+	)
 	if err != nil {
 		return nil, err
 	}
-	if len(resFrame.Properties) != len(getReq.Properties) {
-		return nil, fmt.Errorf("unexpected property count: got %d, want %d", len(resFrame.Properties), len(getReq.Properties))
-	}
 
-	sb := &StorageBattery{}
-	for _, prop := range resFrame.Properties {
-		switch prop.EPC {
-		case epcACChargeableElectricEnergy:
-			val, err := parseStorageBatteryWh(prop.EDT)
-			if err != nil {
-				return nil, fmt.Errorf("invalid acChargeableElectricEnergy data: %w", err)
-			}
-			sb.ACChargeableElectricEnergy = val
-		case epcACDischargeableElectricEnergy:
-			val, err := parseStorageBatteryWh(prop.EDT)
-			if err != nil {
-				return nil, fmt.Errorf("invalid acDischargeableElectricEnergy data: %w", err)
-			}
-			sb.ACDischargeableElectricEnergy = val
-		case epcACCumulativeChargingElectricEnergy:
-			val, err := parseStorageBatteryWh(prop.EDT)
-			if err != nil {
-				return nil, fmt.Errorf("invalid acCumulativeChargingElectricEnergy data: %w", err)
-			}
-			sb.ACCumulativeChargingElectricEnergy = val
-		case epcACCumulativeDischargingElectricEnergy:
-			val, err := parseStorageBatteryWh(prop.EDT)
-			if err != nil {
-				return nil, fmt.Errorf("invalid acCumulativeDischargingElectricEnergy data: %w", err)
-			}
-			sb.ACCumulativeDischargingElectricEnergy = val
-		default:
-			return nil, fmt.Errorf("unexpected EPC: 0x%X", prop.EPC)
-		}
+	reading := &StorageBattery{}
+	reading.ACChargeableElectricEnergy, err = decodeMeterValue(values[epcACChargeableElectricEnergy], 999_999_999)
+	if err != nil {
+		return nil, fmt.Errorf("acChargeableElectricEnergy (EPC 0x%02X): %w", epcACChargeableElectricEnergy, err)
 	}
-
-	return sb, nil
+	reading.ACDischargeableElectricEnergy, err = decodeMeterValue(values[epcACDischargeableElectricEnergy], 999_999_999)
+	if err != nil {
+		return nil, fmt.Errorf("acDischargeableElectricEnergy (EPC 0x%02X): %w", epcACDischargeableElectricEnergy, err)
+	}
+	reading.ACCumulativeChargingElectricEnergy, err = decodeMeterValue(values[epcACCumulativeChargingElectricEnergy], 999_999_999)
+	if err != nil {
+		return nil, fmt.Errorf("acCumulativeChargingElectricEnergy (EPC 0x%02X): %w", epcACCumulativeChargingElectricEnergy, err)
+	}
+	reading.ACCumulativeDischargingElectricEnergy, err = decodeMeterValue(values[epcACCumulativeDischargingElectricEnergy], 999_999_999)
+	if err != nil {
+		return nil, fmt.Errorf("acCumulativeDischargingElectricEnergy (EPC 0x%02X): %w", epcACCumulativeDischargingElectricEnergy, err)
+	}
+	return reading, nil
 }
 
 type StorageBattery struct {
@@ -92,11 +69,4 @@ type StorageBattery struct {
 
 	// This property indicates the cumulative discharging electric energy (AC) in 0.001kWh.
 	ACCumulativeDischargingElectricEnergy uint32
-}
-
-func parseStorageBatteryWh(edts []byte) (uint32, error) {
-	if len(edts) != 4 {
-		return 0, fmt.Errorf("expected 4 bytes, got %d", len(edts))
-	}
-	return binary.BigEndian.Uint32(edts), nil
 }

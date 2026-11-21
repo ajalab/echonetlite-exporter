@@ -41,6 +41,9 @@ func Deserialize(data []byte) (*Frame, error) {
 	if len(data) < 12 {
 		return nil, fmt.Errorf("packet too short")
 	}
+	if data[0] != 0x10 || data[1] != 0x81 {
+		return nil, fmt.Errorf("unsupported ECHONET Lite header %X", data[:2])
+	}
 	f := &Frame{
 		TID: binary.BigEndian.Uint16(data[2:4]),
 		ESV: data[10],
@@ -49,22 +52,28 @@ func Deserialize(data []byte) (*Frame, error) {
 	copy(f.DEOJ[:], data[7:10])
 
 	opc := int(data[11])
+	if opc == 0 {
+		return nil, fmt.Errorf("empty property list")
+	}
 	offset := 12
 	for i := 0; i < opc; i++ {
 		if offset+2 > len(data) {
-			break
+			return nil, fmt.Errorf("truncated property header at index %d", i)
 		}
 		epc := data[offset]
 		pdc := int(data[offset+1])
 		offset += 2
 		if offset+pdc > len(data) {
-			break
+			return nil, fmt.Errorf("truncated EDT for EPC 0x%02X", epc)
 		}
 		f.Properties = append(f.Properties, Property{
 			EPC: epc,
 			EDT: data[offset : offset+pdc],
 		})
 		offset += pdc
+	}
+	if offset != len(data) {
+		return nil, fmt.Errorf("trailing data after %d properties", opc)
 	}
 	return f, nil
 }

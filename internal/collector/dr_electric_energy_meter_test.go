@@ -1,86 +1,34 @@
 package collector
 
 import (
-	"context"
-	"errors"
 	"testing"
-	"time"
 
 	"github.com/ajalab/echonetlite-exporter/internal/echonetlite"
-	"github.com/prometheus/client_golang/prometheus/testutil"
 )
 
-type fakeDRElectricEnergyMeterClient struct {
-	getFn func(ctx context.Context, host string, eoj echonetlite.EOJ) (*echonetlite.DRElectricEnergyMeter, error)
-}
-
-func (f fakeDRElectricEnergyMeterClient) Get(ctx context.Context, host string, eoj echonetlite.EOJ) (*echonetlite.DRElectricEnergyMeter, error) {
-	return f.getFn(ctx, host, eoj)
-}
-
-func TestDRElectricEnergyMeterCollectSuccessUpdatesMetricsAndSuccessState(t *testing.T) {
-	collectMetrics := NewCollectMetrics()
-	device := echonetlite.NewDevice("192.0.2.20", echonetlite.EOJ{0x02, 0x8E, 0x01})
-	c := NewDRElectricEnergyMeterCollector(
-		fakeDRElectricEnergyMeterClient{
-			getFn: func(ctx context.Context, host string, eoj echonetlite.EOJ) (*echonetlite.DRElectricEnergyMeter, error) {
-				return &echonetlite.DRElectricEnergyMeter{
-					CumulativeAmountsOfElectricEnergyUnit:          0.01,
-					ACInputCumulativeElectricEnergy:                10,
-					ACOutputCumulativeElectricEnergy:               20,
-					IndependentOperationCumulativeElectricEnergy:   30,
-					ACInstantaneousElectricPower:                   -120,
-					IndependentOperationInstantaneousElectricPower: 80,
-				}, nil
-			},
-		},
-		time.Second,
-		time.Second,
-		collectMetrics,
-		[]echonetlite.Device{device},
-	)
-
-	c.collect(context.Background(), []echonetlite.Device{device})
-	assertCollectSuccess(t, collectMetrics, device, 1)
-
-	gotACInOut := testutil.ToFloat64(c.acInOutInstantaneousPowerGauge.WithLabelValues(device.Host(), device.EOJ().String()))
-	assertFloatEqual(t, gotACInOut, -120)
-	gotIndepPower := testutil.ToFloat64(c.independentOperationInstantaneousPowerGauge.WithLabelValues(device.Host(), device.EOJ().String()))
-	assertFloatEqual(t, gotIndepPower, 80)
-
-	key := cumulativeDRElectricEnergyMeterKey{host: device.Host(), eoj: device.EOJ().String()}
-	gotACInput, ok := c.acInputCumulativeEnergy[key]
-	if !ok {
-		t.Fatalf("expected AC input cumulative energy for key %+v", key)
+func TestDRElectricEnergyMeterCollectorPublishesMetrics(t *testing.T) {
+	reading := &echonetlite.DRElectricEnergyMeter{
+		CumulativeAmountsOfElectricEnergyUnit: 0.1,
+		ACInputCumulativeElectricEnergy:       new(uint32(10)), ACOutputCumulativeElectricEnergy: new(uint32(20)),
+		IndependentOperationCumulativeElectricEnergy: new(uint32(1)),
+		ACInstantaneousElectricPower:                 new(int32(-100)), IndependentOperationInstantaneousElectricPower: new(int32(55)),
 	}
-	assertFloatApprox(t, gotACInput, 360000, 0.1)
-	gotACOutput, ok := c.acOutputCumulativeEnergy[key]
-	if !ok {
-		t.Fatalf("expected AC output cumulative energy for key %+v", key)
-	}
-	assertFloatApprox(t, gotACOutput, 720000, 0.1)
-	gotIndepEnergy, ok := c.independentOperationCumulativeEnergy[key]
-	if !ok {
-		t.Fatalf("expected independent operation cumulative energy for key %+v", key)
-	}
-	assertFloatApprox(t, gotIndepEnergy, 1080000, 0.1)
-}
-
-func TestDRElectricEnergyMeterCollectFailureSetsSuccessState(t *testing.T) {
-	collectMetrics := NewCollectMetrics()
-	device := echonetlite.NewDevice("192.0.2.20", echonetlite.EOJ{0x02, 0x8E, 0x01})
-	c := NewDRElectricEnergyMeterCollector(
-		fakeDRElectricEnergyMeterClient{
-			getFn: func(ctx context.Context, host string, eoj echonetlite.EOJ) (*echonetlite.DRElectricEnergyMeter, error) {
-				return nil, errors.New("test error")
-			},
-		},
-		time.Second,
-		time.Second,
-		collectMetrics,
-		[]echonetlite.Device{device},
-	)
-
-	c.collect(context.Background(), []echonetlite.Device{device})
-	assertCollectSuccess(t, collectMetrics, device, 0)
+	const want = `
+# HELP echonetlite_dr_electric_energy_meter_ac_inout_electric_power_watts Measured instantaneous electric power (AC input/output).
+# TYPE echonetlite_dr_electric_energy_meter_ac_inout_electric_power_watts gauge
+echonetlite_dr_electric_energy_meter_ac_inout_electric_power_watts{eoj="028E01",host="192.0.2.10"} -100
+# HELP echonetlite_dr_electric_energy_meter_ac_input_electric_energy_joules_total Measured cumulative amounts of electric energy (AC input).
+# TYPE echonetlite_dr_electric_energy_meter_ac_input_electric_energy_joules_total counter
+echonetlite_dr_electric_energy_meter_ac_input_electric_energy_joules_total{eoj="028E01",host="192.0.2.10"} 3600000
+# HELP echonetlite_dr_electric_energy_meter_ac_output_electric_energy_joules_total Measured cumulative amounts of electric energy (AC output).
+# TYPE echonetlite_dr_electric_energy_meter_ac_output_electric_energy_joules_total counter
+echonetlite_dr_electric_energy_meter_ac_output_electric_energy_joules_total{eoj="028E01",host="192.0.2.10"} 7200000
+# HELP echonetlite_dr_electric_energy_meter_independent_operation_electric_energy_joules_total Measured cumulative amounts of electric energy (output during a power outage).
+# TYPE echonetlite_dr_electric_energy_meter_independent_operation_electric_energy_joules_total counter
+echonetlite_dr_electric_energy_meter_independent_operation_electric_energy_joules_total{eoj="028E01",host="192.0.2.10"} 360000
+# HELP echonetlite_dr_electric_energy_meter_independent_operation_electric_power_watts Measured instantaneous electric power (output during a power outage).
+# TYPE echonetlite_dr_electric_energy_meter_independent_operation_electric_power_watts gauge
+echonetlite_dr_electric_energy_meter_independent_operation_electric_power_watts{eoj="028E01",host="192.0.2.10"} 55
+`
+	assertPublishedMetrics(t, NewDRElectricEnergyMeterCollector, echonetlite.ClassDRElectricEnergyMeter, reading, want)
 }

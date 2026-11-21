@@ -2,6 +2,7 @@ package echonetlite
 
 import (
 	"context"
+	"fmt"
 	"log/slog"
 	"net"
 )
@@ -20,66 +21,44 @@ func NewNodeProfileClient(conn *Connection) NodeProfileClient {
 }
 
 func (c NodeProfileClient) Scan(ctx context.Context) ([]Node, error) {
-	req := Frame{
-		SEOJ: EOJ{0x05, 0xFF, 0x01},
-		DEOJ: EOJ{0x0E, 0xF0, 0x01},
-		ESV:  0x62,
-		Properties: []Property{
-			{EPC: 0x80, EDT: []byte{}},
-			{EPC: 0xD6, EDT: []byte{}},
-		},
-	}
+	req := newGetRequest(EOJ{0x0E, 0xF0, 0x01}, []uint8{0x80, 0xD6})
 	responses, err := c.conn.Multicast(ctx, req)
 	if err != nil {
 		return nil, err
 	}
 
 	var nodes []Node
-loopResponses:
 	for _, res := range responses {
-		logger := slog.With()
-
-		var operatingStatus bool
-		var instanceList []EOJ
-		for _, p := range res.Frame.Properties {
-			if len(p.EDT) == 0 {
-				logger.Warn(
-					"missing EDT",
-					"seoj", res.Frame.SEOJ,
-					"deoj", res.Frame.DEOJ,
-					"addr", res.Addr.String(),
-				)
-				continue loopResponses
-			}
-			switch p.EPC {
-			case 0x80:
-				switch p.EDT[0] {
-				case 0x30:
-					operatingStatus = true
-				case 0x31:
-					operatingStatus = false
-				}
-			case 0xD6:
-				edts := p.EDT
-				for i := 1; i+3 <= len(edts); i += 3 {
-					var instance EOJ
-					copy(instance[:], edts[i:i+3])
-					instanceList = append(instanceList, instance)
-				}
-			}
+		profile, err := decodeNodeProfile(req, res.Frame)
+		if err != nil {
+			slog.Warn("ignoring invalid node profile response", "addr", res.Addr.String(), "err", err)
+			continue
 		}
-
 		host, _, err := net.SplitHostPort(res.Addr.String())
 		if err != nil {
 			host = res.Addr.String()
 		}
-		nodes = append(nodes, Node{
-			Host: host,
-			NodeProfile: NodeProfile{
-				OperatingStatus:       operatingStatus,
-				SelfNodeInstanceListS: instanceList,
-			},
-		})
+		nodes = append(nodes, Node{Host: host, NodeProfile: profile})
 	}
 	return nodes, nil
+}
+
+func decodeNodeProfile(req Frame, res *Frame) (NodeProfile, error) {
+	values, err := getResponseValues(req, res)
+	if err != nil {
+		return NodeProfile{}, err
+	}
+	status, err := decodeByte(values[0x80], 0x30, 0x31)
+	if err != nil {
+		return NodeProfile{}, fmt.Errorf("operating status (EPC 0x80): %w", err)
+	}
+	instances := values[0xD6]
+	if len(instances) == 0 || len(instances) != 1+3*int(instances[0]) {
+		return NodeProfile{}, fmt.Errorf("invalid instance list length (EPC 0xD6)")
+	}
+	profile := NodeProfile{OperatingStatus: status == 0x30}
+	for i := 1; i < len(instances); i += 3 {
+		profile.SelfNodeInstanceListS = append(profile.SelfNodeInstanceListS, EOJ(instances[i:i+3]))
+	}
+	return profile, nil
 }

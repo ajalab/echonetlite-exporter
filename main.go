@@ -23,7 +23,7 @@ var (
 	netMulticastInterface = flag.String("net.multicastInterface", "", "Network interface for UDP multicast")
 	discoveryScanDuration = flag.Duration("discovery.scanDuration", 10*time.Second, "Duration for scanning ECHONET Lite nodes")
 	collectorInterval     = flag.Duration("collector.interval", 15*time.Second, "Interval for collecting metrics from ECHONET Lite devices")
-	collectorTimeout      = flag.Duration("collector.timeout", 10*time.Second, "Timeout for collecting metrics from ECHONET Lite devices")
+	responseWait          = flag.Duration("collector.timeout", 10*time.Second, "Response wait per ECHONET Lite Get request, subject to the device AIF minimum")
 )
 
 type deviceCollector interface {
@@ -32,62 +32,58 @@ type deviceCollector interface {
 }
 
 type Exporter struct {
-	collectors     []deviceCollector
-	collectMetrics *collector.CollectMetrics
+	collectors []deviceCollector
 }
 
 func NewExporter(conn *echonetlite.Connection, targets map[uint16][]echonetlite.Device) *Exporter {
-	collectMetrics := collector.NewCollectMetrics()
-	interval, timeout := *collectorInterval, *collectorTimeout
+	interval := *collectorInterval
 	return &Exporter{
-		collectMetrics: collectMetrics,
 		collectors: []deviceCollector{
 			collector.NewPowerDistributionBoardMeteringCollector(
-				echonetlite.NewPowerDistributionBoardMeteringClient(conn),
-				interval, timeout, collectMetrics, targets[echonetlite.ClassPowerDistributionBoardMetering],
+				echonetlite.NewPowerDistributionBoardMeteringClient(conn).Get,
+				interval, targets[echonetlite.ClassPowerDistributionBoardMetering],
 			),
 			collector.NewDRElectricEnergyMeterCollector(
-				echonetlite.NewDRElectricEnergyMeterClient(conn),
-				interval, timeout, collectMetrics, targets[echonetlite.ClassDRElectricEnergyMeter],
+				echonetlite.NewDRElectricEnergyMeterClient(conn).Get,
+				interval, targets[echonetlite.ClassDRElectricEnergyMeter],
 			),
 			collector.NewPVPowerGenerationCollector(
-				echonetlite.NewPVPowerGenerationClient(conn),
-				interval, timeout, collectMetrics, targets[echonetlite.ClassPVPowerGeneration],
+				echonetlite.NewPVPowerGenerationClient(conn).Get,
+				interval, targets[echonetlite.ClassPVPowerGeneration],
 			),
 			collector.NewStorageBatteryCollector(
-				echonetlite.NewStorageBatteryClient(conn),
-				interval, timeout, collectMetrics, targets[echonetlite.ClassStorageBattery],
+				echonetlite.NewStorageBatteryClient(conn).Get,
+				interval, targets[echonetlite.ClassStorageBattery],
 			),
 			collector.NewMultipleInputPCSCollector(
-				echonetlite.NewMultipleInputPCSClient(conn),
-				interval, timeout, collectMetrics, targets[echonetlite.ClassMultipleInputPCS],
+				echonetlite.NewMultipleInputPCSClient(conn).Get,
+				interval, targets[echonetlite.ClassMultipleInputPCS],
 			),
 			collector.NewInstantaneousWaterHeaterCollector(
-				echonetlite.NewInstantaneousWaterHeaterClient(conn),
-				interval, timeout, collectMetrics, targets[echonetlite.ClassInstantaneousWaterHeater],
+				echonetlite.NewInstantaneousWaterHeaterClient(conn).Get,
+				interval, targets[echonetlite.ClassInstantaneousWaterHeater],
 			),
 			collector.NewWattHourMeterCollector(
-				echonetlite.NewWattHourMeterClient(conn),
-				interval, timeout, collectMetrics, targets[echonetlite.ClassWattHourMeter],
+				echonetlite.NewWattHourMeterClient(conn).Get,
+				interval, targets[echonetlite.ClassWattHourMeter],
 			),
 			collector.NewWaterFlowMeterCollector(
-				echonetlite.NewWaterFlowMeterClient(conn),
-				interval, timeout, collectMetrics, targets[echonetlite.ClassWaterFlowMeter],
+				echonetlite.NewWaterFlowMeterClient(conn).Get,
+				interval, targets[echonetlite.ClassWaterFlowMeter],
 			),
 			collector.NewGasMeterCollector(
-				echonetlite.NewGasMeterClient(conn),
-				interval, timeout, collectMetrics, targets[echonetlite.ClassGasMeter],
+				echonetlite.NewGasMeterClient(conn).Get,
+				interval, targets[echonetlite.ClassGasMeter],
 			),
 			collector.NewHybridWaterHeaterCollector(
-				echonetlite.NewHybridWaterHeaterClient(conn),
-				interval, timeout, collectMetrics, targets[echonetlite.ClassHybridWaterHeater],
+				echonetlite.NewHybridWaterHeaterClient(conn).Get,
+				interval, targets[echonetlite.ClassHybridWaterHeater],
 			),
 		},
 	}
 }
 
 func (e *Exporter) RegisterMetrics() {
-	prometheus.MustRegister(e.collectMetrics.Collector())
 	for _, c := range e.collectors {
 		prometheus.MustRegister(c)
 	}
@@ -138,7 +134,7 @@ func main() {
 		}
 	}()
 
-	conn, err := echonetlite.NewConnection(*netMulticastInterface)
+	conn, err := echonetlite.NewConnection(*netMulticastInterface, *responseWait)
 	if err != nil {
 		log.Fatalf("connection error: %v", err)
 	}

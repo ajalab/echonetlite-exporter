@@ -4,6 +4,7 @@ import (
 	"context"
 	"encoding/binary"
 	"fmt"
+	"time"
 )
 
 const (
@@ -22,44 +23,25 @@ func NewPVPowerGenerationClient(conn *Connection) *PVPowerGenerationClient {
 }
 
 func (p *PVPowerGenerationClient) Get(ctx context.Context, host string, eoj EOJ) (*PVPowerGeneration, error) {
-	getReq := Frame{
-		SEOJ: EOJ{0x05, 0xFF, 0x01},
-		DEOJ: eoj,
-		ESV:  0x62,
-		Properties: []Property{
-			{EPC: epcInstantaneousElectricPowerGeneration, EDT: []byte{}},
-			{EPC: epcCumulativeElectricEnergyOfGeneration, EDT: []byte{}},
-		},
-	}
-	resFrame, err := p.conn.Unicast(ctx, host, getReq)
+	read := propertyReader{conn: p.conn, host: host, eoj: eoj, minimumWait: 20 * time.Second}
+	values, err := read.required(ctx,
+		epcInstantaneousElectricPowerGeneration,
+		epcCumulativeElectricEnergyOfGeneration,
+	)
 	if err != nil {
 		return nil, err
 	}
-	if len(resFrame.Properties) != len(getReq.Properties) {
-		return nil, fmt.Errorf("unexpected property count: got %d, want %d", len(resFrame.Properties), len(getReq.Properties))
-	}
 
-	pvpg := &PVPowerGeneration{}
-	for _, prop := range resFrame.Properties {
-		switch prop.EPC {
-		case epcInstantaneousElectricPowerGeneration:
-			val, err := parseInstantaneousElectricPowerGeneration(prop.EDT)
-			if err != nil {
-				return nil, fmt.Errorf("invalid instantaneousElectricPowerGeneration data: %w", err)
-			}
-			pvpg.InstantaneousElectricPowerGeneration = val
-		case epcCumulativeElectricEnergyOfGeneration:
-			val, err := parseCumulativeElectricEnergyOfGeneration(prop.EDT)
-			if err != nil {
-				return nil, fmt.Errorf("invalid cumulativeElectricEnergyOfGeneration data: %w", err)
-			}
-			pvpg.CumulativeElectricEnergyOfGeneration = val
-		default:
-			return nil, fmt.Errorf("unexpected EPC: 0x%X", prop.EPC)
-		}
+	reading := &PVPowerGeneration{}
+	reading.InstantaneousElectricPowerGeneration, err = decodeInstantaneousElectricPowerGeneration(values[epcInstantaneousElectricPowerGeneration])
+	if err != nil {
+		return nil, fmt.Errorf("instantaneousElectricPowerGeneration (EPC 0x%02X): %w", epcInstantaneousElectricPowerGeneration, err)
 	}
-
-	return pvpg, nil
+	reading.CumulativeElectricEnergyOfGeneration, err = decodeMeterValue(values[epcCumulativeElectricEnergyOfGeneration], 999_999_999)
+	if err != nil {
+		return nil, fmt.Errorf("cumulativeElectricEnergyOfGeneration (EPC 0x%02X): %w", epcCumulativeElectricEnergyOfGeneration, err)
+	}
+	return reading, nil
 }
 
 type PVPowerGeneration struct {
@@ -70,18 +52,13 @@ type PVPowerGeneration struct {
 	CumulativeElectricEnergyOfGeneration uint32
 }
 
-func parseInstantaneousElectricPowerGeneration(edts []byte) (uint16, error) {
-	if len(edts) != 2 {
-		return 0, fmt.Errorf("expected 2 bytes, got %d", len(edts))
+func decodeInstantaneousElectricPowerGeneration(edt []byte) (uint16, error) {
+	if len(edt) != 2 {
+		return 0, fmt.Errorf("expected 2 bytes, got %d", len(edt))
 	}
-	val := binary.BigEndian.Uint16(edts)
-	return val, nil
-}
-
-func parseCumulativeElectricEnergyOfGeneration(edts []byte) (uint32, error) {
-	if len(edts) != 4 {
-		return 0, fmt.Errorf("expected 4 bytes, got %d", len(edts))
+	value := binary.BigEndian.Uint16(edt)
+	if value > 65_533 {
+		return 0, fmt.Errorf("electric power out of range: %d", value)
 	}
-	val := binary.BigEndian.Uint32(edts)
-	return val, nil
+	return value, nil
 }

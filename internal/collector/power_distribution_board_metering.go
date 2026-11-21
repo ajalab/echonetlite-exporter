@@ -2,149 +2,57 @@ package collector
 
 import (
 	"context"
-	"fmt"
-	"log/slog"
-	"sync"
+	"strconv"
 	"time"
 
 	"github.com/ajalab/echonetlite-exporter/internal/echonetlite"
 	"github.com/prometheus/client_golang/prometheus"
 )
 
+// PowerDistributionBoardMeteringCollector collects and publishes metrics for its ECHONET Lite device class.
 type PowerDistributionBoardMeteringCollector struct {
-	interval time.Duration
-	timeout  time.Duration
-	client   powerDistributionBoardMeteringClient
-	targets  []echonetlite.Device
-
-	instantaneousElectricPowerSimplexGauge *prometheus.GaugeVec
-	cumulativeElectricEnergySimplexDesc    *prometheus.Desc
-	cumulativeElectricEnergySimplex        map[cumulativeElectricEnergyKey]float64
-	cumulativeElectricEnergySimplexMu      sync.Mutex
-	collectMetrics                         *CollectMetrics
+	*collector
 }
 
-type powerDistributionBoardMeteringClient interface {
-	Get(ctx context.Context, host string, eoj echonetlite.EOJ) (*echonetlite.PowerDistributionBoardMetering, error)
-}
-
-type cumulativeElectricEnergyKey struct {
-	host    string
-	eoj     string
-	channel string
-}
-
+// NewPowerDistributionBoardMeteringCollector creates a PowerDistributionBoardMeteringCollector.
 func NewPowerDistributionBoardMeteringCollector(
-	client powerDistributionBoardMeteringClient,
+	get func(context.Context, string, echonetlite.EOJ) (*echonetlite.PowerDistributionBoardMetering, error),
 	interval time.Duration,
-	timeout time.Duration,
-	collectMetrics *CollectMetrics,
 	targets []echonetlite.Device,
 ) *PowerDistributionBoardMeteringCollector {
+	labels := []string{"host", "eoj", "channel"}
+	power := prometheus.NewDesc(
+		"echonetlite_power_distribution_board_metering_electric_power_simplex_watts",
+		"Measured instantaneous power consumption list (simplex).",
+		labels, nil,
+	)
+	energy := prometheus.NewDesc(
+		"echonetlite_power_distribution_board_metering_electric_energy_simplex_joules_total",
+		"Measured cumulative amount of electric power consumption list (simplex).",
+		labels, nil,
+	)
 	return &PowerDistributionBoardMeteringCollector{
-		interval: interval,
-		timeout:  timeout,
-		client:   client,
-		targets:  targets,
-		instantaneousElectricPowerSimplexGauge: prometheus.NewGaugeVec(
-			prometheus.GaugeOpts{
-				Name: "echonetlite_power_distribution_board_metering_electric_power_simplex_watts",
-				Help: "Instantaneous electric power per channel (simplex).",
+		collector: newCollector(interval, targets, []*prometheus.Desc{power, energy}, get,
+			func(device echonetlite.Device, reading *echonetlite.PowerDistributionBoardMetering) []prometheus.Metric {
+				host, eoj := device.Host(), device.EOJ().String()
+				var metrics []prometheus.Metric
+				powers := reading.InstantaneousElectricPowerListSimplex
+				for i, value := range powers.InstantaneousElectricPower {
+					if value != nil {
+						channel := strconv.Itoa(int(powers.StartChannel) + i)
+						metrics = append(metrics, prometheus.MustNewConstMetric(power, prometheus.GaugeValue, float64(*value), host, eoj, channel))
+					}
+				}
+				energies := reading.CumulativeElectricEnergyListSimplex
+				scale := reading.UnitForCumulativeElectricEnergy * joulesPerKilowattHour
+				for i, value := range energies.ElectricEnergy {
+					if value != nil {
+						channel := strconv.Itoa(int(energies.StartChannel) + i)
+						metrics = append(metrics, prometheus.MustNewConstMetric(energy, prometheus.CounterValue, float64(*value)*scale, host, eoj, channel))
+					}
+				}
+				return metrics
 			},
-			[]string{"host", "eoj", "channel"},
 		),
-		cumulativeElectricEnergySimplexDesc: prometheus.NewDesc(
-			"echonetlite_power_distribution_board_metering_electric_energy_simplex_joules_total",
-			"Cumulative amount of electric power consumption (simplex)",
-			[]string{"host", "eoj", "channel"},
-			nil,
-		),
-		cumulativeElectricEnergySimplex: make(map[cumulativeElectricEnergyKey]float64),
-		collectMetrics:                  collectMetrics,
-	}
-}
-
-func (c *PowerDistributionBoardMeteringCollector) Start(ctx context.Context) {
-	go c.collectLoop(ctx, c.targets)
-}
-
-func (c *PowerDistributionBoardMeteringCollector) Describe(ch chan<- *prometheus.Desc) {
-	c.instantaneousElectricPowerSimplexGauge.Describe(ch)
-	ch <- c.cumulativeElectricEnergySimplexDesc
-}
-
-func (c *PowerDistributionBoardMeteringCollector) Collect(ch chan<- prometheus.Metric) {
-	c.instantaneousElectricPowerSimplexGauge.Collect(ch)
-	c.cumulativeElectricEnergySimplexMu.Lock()
-	for key, value := range c.cumulativeElectricEnergySimplex {
-		ch <- prometheus.MustNewConstMetric(
-			c.cumulativeElectricEnergySimplexDesc,
-			prometheus.CounterValue,
-			value,
-			key.host,
-			key.eoj,
-			key.channel,
-		)
-	}
-	c.cumulativeElectricEnergySimplexMu.Unlock()
-}
-
-func (c *PowerDistributionBoardMeteringCollector) collectLoop(ctx context.Context, targets []echonetlite.Device) {
-	ticker := time.NewTicker(c.interval)
-	defer ticker.Stop()
-
-	c.collect(ctx, targets)
-	for {
-		select {
-		case <-ticker.C:
-			c.collect(ctx, targets)
-		case <-ctx.Done():
-			return
-		}
-	}
-}
-
-func (c *PowerDistributionBoardMeteringCollector) collect(ctx context.Context, devices []echonetlite.Device) {
-	for _, device := range devices {
-		reqCtx, cancel := context.WithTimeout(ctx, c.timeout)
-		props, err := c.client.Get(reqCtx, device.Host(), device.EOJ())
-		cancel()
-
-		if err != nil {
-			c.collectMetrics.SetSuccess(device.Host(), device.EOJ().String(), false)
-			slog.Warn("failed to collect stats", "host", device.Host(), "eoj", device.EOJ().String(), "err", err)
-			continue
-		}
-		c.collectMetrics.SetSuccess(device.Host(), device.EOJ().String(), true)
-
-		c.updateMetrics(device, props)
-	}
-}
-
-func (c *PowerDistributionBoardMeteringCollector) updateMetrics(
-	device echonetlite.Device,
-	pdbm *echonetlite.PowerDistributionBoardMetering,
-) {
-	{
-		start := int(pdbm.InstantaneousElectricPowerListSimplex.StartChannel)
-		for i, val := range pdbm.InstantaneousElectricPowerListSimplex.InstantaneousElectricPower {
-			channel := fmt.Sprintf("%d", start+i)
-			c.instantaneousElectricPowerSimplexGauge.WithLabelValues(device.Host(), device.EOJ().String(), channel).Set(float64(val))
-		}
-	}
-	{
-		start := int(pdbm.CumulativeElectricEnergyListSimplex.StartChannel)
-		c.cumulativeElectricEnergySimplexMu.Lock()
-		for i, val := range pdbm.CumulativeElectricEnergyListSimplex.ElectricEnergy {
-			channel := fmt.Sprintf("%d", start+i)
-			cumulativeValue := float64(val) * float64(pdbm.UnitForCumulativeEnergy) * 1000 * 3600 // kWh to J
-			key := cumulativeElectricEnergyKey{
-				host:    device.Host(),
-				eoj:     device.EOJ().String(),
-				channel: channel,
-			}
-			c.cumulativeElectricEnergySimplex[key] = cumulativeValue
-		}
-		c.cumulativeElectricEnergySimplexMu.Unlock()
 	}
 }
