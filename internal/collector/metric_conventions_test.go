@@ -112,8 +112,8 @@ func assertMRAMetricConventions(t *testing.T, registry *prometheus.Registry, cla
 		delete(unmatched, wantName)
 
 		family := families[index]
-		if wantHelp := mra.PropertyName.English + "."; family.GetHelp() != wantHelp {
-			t.Errorf("%s/%s: %s HELP = %q, want %q (MRA propertyName.en followed by a period)",
+		if wantHelp := mra.PropertyName.English + ". EPC=" + mra.EPC; family.GetHelp() != wantHelp {
+			t.Errorf("%s/%s: %s HELP = %q, want %q (MRA propertyName.en followed by a period and the EPC)",
 				classCode, mra.EPC, wantName, family.GetHelp(), wantHelp)
 		}
 		if gotType := family.GetType().String(); gotType != wantType {

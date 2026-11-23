@@ -20,9 +20,10 @@ func NewWaterFlowMeterCollector(
 	targets []echonetlite.Device,
 ) *WaterFlowMeterCollector {
 	flow := newMetricDescriptor(
+		echonetlite.EPCCumulativeFlowingWater,
 		"cumulativeFlowingWater", "cubic_meters", cumulativeReading,
 		"echonetlite_water_flow_meter_flowing_water_cubic_meters_total",
-		"Measured cumulative amount of flowing water.",
+		"Measured cumulative amount of flowing water",
 		deviceLabels,
 	)
 	descs := []metricDescriptor{flow}

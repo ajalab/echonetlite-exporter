@@ -8,11 +8,11 @@ import (
 
 const (
 	epcDRElectricEnergyMeterCumulativeAmountsOfElectricEnergyUnit          = 0xD4
-	epcDRElectricEnergyMeterACInputCumulativeElectricEnergy                = 0xE0
-	epcDRElectricEnergyMeterACOutputCumulativeElectricEnergy               = 0xE2
-	epcDRElectricEnergyMeterIndependentOperationCumulativeElectricEnergy   = 0xE4
-	epcDRElectricEnergyMeterACInstantaneousElectricPower                   = 0xE9
-	epcDRElectricEnergyMeterIndependentOperationInstantaneousElectricPower = 0xEA
+	EPCDRElectricEnergyMeterACInputCumulativeElectricEnergy                = 0xE0
+	EPCDRElectricEnergyMeterACOutputCumulativeElectricEnergy               = 0xE2
+	EPCDRElectricEnergyMeterIndependentOperationCumulativeElectricEnergy   = 0xE4
+	EPCDRElectricEnergyMeterACInstantaneousElectricPower                   = 0xE9
+	EPCDRElectricEnergyMeterIndependentOperationInstantaneousElectricPower = 0xEA
 )
 
 type DRElectricEnergyMeterClient struct {
@@ -42,7 +42,7 @@ func (c *DRElectricEnergyMeterClient) Get(ctx context.Context, host string, eoj 
 	if err != nil {
 		return nil, err
 	}
-	required := supportedEPCs(supported, epcDRElectricEnergyMeterACInputCumulativeElectricEnergy, epcDRElectricEnergyMeterACOutputCumulativeElectricEnergy)
+	required := supportedEPCs(supported, EPCDRElectricEnergyMeterACInputCumulativeElectricEnergy, EPCDRElectricEnergyMeterACOutputCumulativeElectricEnergy)
 	if len(required) == 0 {
 		return nil, fmt.Errorf("Get property map lacks both AC energy directions (EPC 0xE0 and 0xE2)")
 	}
@@ -57,7 +57,7 @@ func (c *DRElectricEnergyMeterClient) Get(ctx context.Context, host string, eoj 
 		return nil, fmt.Errorf("cumulativeAmountsOfElectricEnergyUnit (EPC 0xD4): %w", err)
 	}
 	values, err := read.group(ctx, required, supportedEPCs(supported,
-		epcDRElectricEnergyMeterIndependentOperationCumulativeElectricEnergy, epcDRElectricEnergyMeterACInstantaneousElectricPower, epcDRElectricEnergyMeterIndependentOperationInstantaneousElectricPower))
+		EPCDRElectricEnergyMeterIndependentOperationCumulativeElectricEnergy, EPCDRElectricEnergyMeterACInstantaneousElectricPower, EPCDRElectricEnergyMeterIndependentOperationInstantaneousElectricPower))
 	if err != nil {
 		return nil, err
 	}
@@ -67,12 +67,12 @@ func (c *DRElectricEnergyMeterClient) Get(ctx context.Context, host string, eoj 
 		epc  uint8
 		dest **uint32
 	}{
-		{epcDRElectricEnergyMeterACInputCumulativeElectricEnergy, &reading.ACInputCumulativeElectricEnergy},
-		{epcDRElectricEnergyMeterACOutputCumulativeElectricEnergy, &reading.ACOutputCumulativeElectricEnergy},
-		{epcDRElectricEnergyMeterIndependentOperationCumulativeElectricEnergy, &reading.IndependentOperationCumulativeElectricEnergy},
+		{EPCDRElectricEnergyMeterACInputCumulativeElectricEnergy, &reading.ACInputCumulativeElectricEnergy},
+		{EPCDRElectricEnergyMeterACOutputCumulativeElectricEnergy, &reading.ACOutputCumulativeElectricEnergy},
+		{EPCDRElectricEnergyMeterIndependentOperationCumulativeElectricEnergy, &reading.IndependentOperationCumulativeElectricEnergy},
 	} {
 		edt := values[field.epc]
-		if len(edt) == 0 || (field.epc == epcDRElectricEnergyMeterIndependentOperationCumulativeElectricEnergy && isNoData(edt, noEnergyData)) {
+		if len(edt) == 0 || (field.epc == EPCDRElectricEnergyMeterIndependentOperationCumulativeElectricEnergy && isNoData(edt, noEnergyData)) {
 			continue
 		}
 		value, err := decodeMeterValue(edt, 999_999_999)
@@ -85,8 +85,8 @@ func (c *DRElectricEnergyMeterClient) Get(ctx context.Context, host string, eoj 
 		epc  uint8
 		dest **int32
 	}{
-		{epcDRElectricEnergyMeterACInstantaneousElectricPower, &reading.ACInstantaneousElectricPower},
-		{epcDRElectricEnergyMeterIndependentOperationInstantaneousElectricPower, &reading.IndependentOperationInstantaneousElectricPower},
+		{EPCDRElectricEnergyMeterACInstantaneousElectricPower, &reading.ACInstantaneousElectricPower},
+		{EPCDRElectricEnergyMeterIndependentOperationInstantaneousElectricPower, &reading.IndependentOperationInstantaneousElectricPower},
 	} {
 		edt := values[field.epc]
 		if len(edt) == 0 || isNoData(edt, noPowerData) {

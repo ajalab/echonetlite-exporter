@@ -20,27 +20,31 @@ func NewStorageBatteryCollector(
 	targets []echonetlite.Device,
 ) *StorageBatteryCollector {
 	chargeableEnergy := newMetricDescriptor(
+		echonetlite.EPCACChargeableElectricEnergy,
 		"acChargeableElectricEnergy", "joules", gaugeReading,
 		"echonetlite_storage_battery_ac_chargeable_electric_energy_joules",
-		"AC chargeable electric energy.",
+		"AC chargeable electric energy",
 		deviceLabels,
 	)
 	dischargeableEnergy := newMetricDescriptor(
+		echonetlite.EPCACDischargeableElectricEnergy,
 		"acDischargeableElectricEnergy", "joules", gaugeReading,
 		"echonetlite_storage_battery_ac_dischargeable_electric_energy_joules",
-		"AC dischargeable electric energy.",
+		"AC dischargeable electric energy",
 		deviceLabels,
 	)
 	chargingEnergy := newMetricDescriptor(
+		echonetlite.EPCACCumulativeChargingElectricEnergy,
 		"acCumulativeChargingElectricEnergy", "joules", cumulativeReading,
 		"echonetlite_storage_battery_ac_charging_electric_energy_joules_total",
-		"AC measured cumulative charging electric energy.",
+		"AC measured cumulative charging electric energy",
 		deviceLabels,
 	)
 	dischargingEnergy := newMetricDescriptor(
+		echonetlite.EPCACCumulativeDischargingElectricEnergy,
 		"acCumulativeDischargingElectricEnergy", "joules", cumulativeReading,
 		"echonetlite_storage_battery_ac_discharging_electric_energy_joules_total",
-		"AC measured cumulative discharging electric energy.",
+		"AC measured cumulative discharging electric energy",
 		deviceLabels,
 	)
 	descs := []metricDescriptor{chargeableEnergy, dischargeableEnergy, chargingEnergy, dischargingEnergy}

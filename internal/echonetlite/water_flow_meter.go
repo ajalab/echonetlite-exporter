@@ -7,7 +7,7 @@ import (
 )
 
 const (
-	epcCumulativeFlowingWater        = 0xE0
+	EPCCumulativeFlowingWater        = 0xE0
 	epcUnitForCumulativeFlowingWater = 0xE1
 )
 
@@ -26,11 +26,11 @@ func NewWaterFlowMeterClient(conn *Connection) *WaterFlowMeterClient {
 
 func (c *WaterFlowMeterClient) Get(ctx context.Context, host string, eoj EOJ) (*WaterFlowMeter, error) {
 	read := propertyReader{conn: c.conn, host: host, eoj: eoj}
-	values, err := read.required(ctx, epcCumulativeFlowingWater, epcUnitForCumulativeFlowingWater)
+	values, err := read.required(ctx, EPCCumulativeFlowingWater, epcUnitForCumulativeFlowingWater)
 	if err != nil {
 		return nil, err
 	}
-	volume, err := decodeMeterValue(values[epcCumulativeFlowingWater], 999_999_999)
+	volume, err := decodeMeterValue(values[EPCCumulativeFlowingWater], 999_999_999)
 	if err != nil {
 		return nil, fmt.Errorf("invalid cumulativeFlowingWater: %w", err)
 	}

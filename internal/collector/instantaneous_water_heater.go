@@ -20,51 +20,59 @@ func NewInstantaneousWaterHeaterCollector(
 	targets []echonetlite.Device,
 ) *InstantaneousWaterHeaterCollector {
 	hotWaterHeating := newMetricDescriptor(
+		echonetlite.EPCHotWaterHeatingStatus,
 		"hotWaterHeatingStatus", "", gaugeReading,
 		"echonetlite_instantaneous_water_heater_hot_water_heating_status",
-		"Hot water heating status.",
+		"Hot water heating status",
 		deviceLabels,
 	)
 	bathHeating := newMetricDescriptor(
+		echonetlite.EPCBathWaterHeatingStatus,
 		"bathWaterHeatingStatus", "", gaugeReading,
 		"echonetlite_instantaneous_water_heater_bath_water_heating_status",
-		"Bath water heater status.",
+		"Bath water heater status",
 		deviceLabels,
 	)
 	autoBath := newMetricDescriptor(
+		echonetlite.EPCAutomaticBathOperation,
 		"automaticBathOperation", "", gaugeReading,
 		"echonetlite_instantaneous_water_heater_automatic_bath_operation",
-		"Bath Auto mode setting.",
+		"Bath Auto mode setting",
 		deviceLabels,
 	)
 	supplyTemperature := newMetricDescriptor(
+		echonetlite.EPCTargetSuppliedWaterTemperature,
 		"targetSuppliedWaterTemperature", "celsius", gaugeReading,
 		"echonetlite_instantaneous_water_heater_target_supplied_water_temperature_celsius",
-		"Set value of hot water temperature.",
+		"Set value of hot water temperature",
 		deviceLabels,
 	)
 	bathTemperature := newMetricDescriptor(
+		echonetlite.EPCTargetBathWaterTemperature,
 		"targetBathWaterTemperature", "celsius", gaugeReading,
 		"echonetlite_instantaneous_water_heater_target_bath_water_temperature_celsius",
-		"Set value of bath temperature.",
+		"Set value of bath temperature",
 		deviceLabels,
 	)
 	showerSupply := newMetricDescriptor(
+		echonetlite.EPCShowerHotWaterSupplyStatus,
 		"showerHotWaterSupplyStatus", "", gaugeReading,
 		"echonetlite_instantaneous_water_heater_shower_hot_water_supply_status",
-		"Shower hot water supply status.",
+		"Shower hot water supply status",
 		deviceLabels,
 	)
 	kitchenSupply := newMetricDescriptor(
+		echonetlite.EPCKitchenHotWaterSupplyStatus,
 		"kitchenHotWaterSupplyStatus", "", gaugeReading,
 		"echonetlite_instantaneous_water_heater_kitchen_hot_water_supply_status",
-		"Kitchen hot water supply status.",
+		"Kitchen hot water supply status",
 		deviceLabels,
 	)
 	bathOperation := newMetricDescriptor(
+		echonetlite.EPCBathOperationStatus,
 		"bathOperationStatus", "", gaugeReading,
 		"echonetlite_instantaneous_water_heater_bath_operation_status",
-		"Bath operation status monitor.",
+		"Bath operation status monitor",
 		deviceLabels,
 	)
 	descs := []metricDescriptor{hotWaterHeating, bathHeating, autoBath, supplyTemperature, bathTemperature, showerSupply, kitchenSupply, bathOperation}

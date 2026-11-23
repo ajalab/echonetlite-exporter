@@ -20,9 +20,10 @@ func NewGasMeterCollector(
 	targets []echonetlite.Device,
 ) *GasMeterCollector {
 	consumption := newMetricDescriptor(
+		echonetlite.EPCCumulativeGasConsumption,
 		"cumulativeGasConsumption", "cubic_meters", cumulativeReading,
 		"echonetlite_gas_meter_gas_consumption_cubic_meters_total",
-		"Cumulative amount of gas consumption measurement value.",
+		"Cumulative amount of gas consumption measurement value",
 		deviceLabels,
 	)
 	descs := []metricDescriptor{consumption}

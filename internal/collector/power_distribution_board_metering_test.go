@@ -17,10 +17,10 @@ func TestPowerDistributionBoardMeteringCollectorPublishesMetrics(t *testing.T) {
 		},
 	}
 	const want = `
-# HELP echonetlite_power_distribution_board_metering_electric_energy_list_simplex_joules_total Measured cumulative amount of electric power consumption list (simplex).
+# HELP echonetlite_power_distribution_board_metering_electric_energy_list_simplex_joules_total Measured cumulative amount of electric power consumption list (simplex). EPC=0xB3
 # TYPE echonetlite_power_distribution_board_metering_electric_energy_list_simplex_joules_total counter
 echonetlite_power_distribution_board_metering_electric_energy_list_simplex_joules_total{channel="3",eoj="028701",host="192.0.2.10"} 720000
-# HELP echonetlite_power_distribution_board_metering_electric_power_list_simplex_watts Measured instantaneous power consumption list (simplex).
+# HELP echonetlite_power_distribution_board_metering_electric_power_list_simplex_watts Measured instantaneous power consumption list (simplex). EPC=0xB7
 # TYPE echonetlite_power_distribution_board_metering_electric_power_list_simplex_watts gauge
 echonetlite_power_distribution_board_metering_electric_power_list_simplex_watts{channel="3",eoj="028701",host="192.0.2.10"} 100
 echonetlite_power_distribution_board_metering_electric_power_list_simplex_watts{channel="5",eoj="028701",host="192.0.2.10"} -60
