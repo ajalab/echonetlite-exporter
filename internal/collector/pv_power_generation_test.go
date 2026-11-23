@@ -11,9 +11,9 @@ func TestPVPowerGenerationCollectorPublishesMetrics(t *testing.T) {
 		InstantaneousElectricPowerGeneration: 450, CumulativeElectricEnergyOfGeneration: 240,
 	}
 	const want = `
-# HELP echonetlite_pv_power_generation_electric_energy_generation_joules_total Measured cumulative amount of electric energy generated.
-# TYPE echonetlite_pv_power_generation_electric_energy_generation_joules_total counter
-echonetlite_pv_power_generation_electric_energy_generation_joules_total{eoj="027901",host="192.0.2.10"} 864000
+# HELP echonetlite_pv_power_generation_electric_energy_of_generation_joules_total Measured cumulative amount of electric energy generated.
+# TYPE echonetlite_pv_power_generation_electric_energy_of_generation_joules_total counter
+echonetlite_pv_power_generation_electric_energy_of_generation_joules_total{eoj="027901",host="192.0.2.10"} 864000
 # HELP echonetlite_pv_power_generation_electric_power_generation_watts Measured instantaneous amount of electricity generated.
 # TYPE echonetlite_pv_power_generation_electric_power_generation_watts gauge
 echonetlite_pv_power_generation_electric_power_generation_watts{eoj="027901",host="192.0.2.10"} 450

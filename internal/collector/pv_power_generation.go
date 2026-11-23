@@ -19,24 +19,26 @@ func NewPVPowerGenerationCollector(
 	interval time.Duration,
 	targets []echonetlite.Device,
 ) *PVPowerGenerationCollector {
-	power := prometheus.NewDesc(
+	power := newMetricDescriptor(
+		"instantaneousElectricPowerGeneration", "watts", instantaneousReading,
 		"echonetlite_pv_power_generation_electric_power_generation_watts",
 		"Measured instantaneous amount of electricity generated.",
-		deviceLabels, nil,
+		deviceLabels,
 	)
-	energy := prometheus.NewDesc(
-		"echonetlite_pv_power_generation_electric_energy_generation_joules_total",
+	energy := newMetricDescriptor(
+		"cumulativeElectricEnergyOfGeneration", "joules", cumulativeReading,
+		"echonetlite_pv_power_generation_electric_energy_of_generation_joules_total",
 		"Measured cumulative amount of electric energy generated.",
-		deviceLabels, nil,
+		deviceLabels,
 	)
-	descs := []*prometheus.Desc{power, energy}
+	descs := []metricDescriptor{power, energy}
 	return &PVPowerGenerationCollector{
 		collector: newCollector(interval, targets, descs, get,
 			func(device echonetlite.Device, reading *echonetlite.PVPowerGeneration) []prometheus.Metric {
 				host, eoj := device.Host(), device.EOJ().String()
 				return []prometheus.Metric{
-					prometheus.MustNewConstMetric(power, prometheus.GaugeValue, float64(reading.InstantaneousElectricPowerGeneration), host, eoj),
-					prometheus.MustNewConstMetric(energy, prometheus.CounterValue, float64(reading.CumulativeElectricEnergyOfGeneration)*joulesPerWattHour, host, eoj),
+					prometheus.MustNewConstMetric(power.desc, prometheus.GaugeValue, float64(reading.InstantaneousElectricPowerGeneration), host, eoj),
+					prometheus.MustNewConstMetric(energy.desc, prometheus.CounterValue, float64(reading.CumulativeElectricEnergyOfGeneration)*joulesPerWattHour, host, eoj),
 				}
 			},
 		),

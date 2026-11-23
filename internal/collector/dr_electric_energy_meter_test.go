@@ -14,9 +14,9 @@ func TestDRElectricEnergyMeterCollectorPublishesMetrics(t *testing.T) {
 		ACInstantaneousElectricPower:                 new(int32(-100)), IndependentOperationInstantaneousElectricPower: new(int32(55)),
 	}
 	const want = `
-# HELP echonetlite_dr_electric_energy_meter_ac_inout_electric_power_watts Measured instantaneous electric power (AC input/output).
-# TYPE echonetlite_dr_electric_energy_meter_ac_inout_electric_power_watts gauge
-echonetlite_dr_electric_energy_meter_ac_inout_electric_power_watts{eoj="028E01",host="192.0.2.10"} -100
+# HELP echonetlite_dr_electric_energy_meter_ac_electric_power_watts Measured instantaneous electric power (AC input/output).
+# TYPE echonetlite_dr_electric_energy_meter_ac_electric_power_watts gauge
+echonetlite_dr_electric_energy_meter_ac_electric_power_watts{eoj="028E01",host="192.0.2.10"} -100
 # HELP echonetlite_dr_electric_energy_meter_ac_input_electric_energy_joules_total Measured cumulative amounts of electric energy (AC input).
 # TYPE echonetlite_dr_electric_energy_meter_ac_input_electric_energy_joules_total counter
 echonetlite_dr_electric_energy_meter_ac_input_electric_energy_joules_total{eoj="028E01",host="192.0.2.10"} 3600000

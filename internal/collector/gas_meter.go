@@ -19,18 +19,19 @@ func NewGasMeterCollector(
 	interval time.Duration,
 	targets []echonetlite.Device,
 ) *GasMeterCollector {
-	consumption := prometheus.NewDesc(
+	consumption := newMetricDescriptor(
+		"cumulativeGasConsumption", "cubic_meters", cumulativeReading,
 		"echonetlite_gas_meter_gas_consumption_cubic_meters_total",
 		"Cumulative amount of gas consumption measurement value.",
-		deviceLabels, nil,
+		deviceLabels,
 	)
-	descs := []*prometheus.Desc{consumption}
+	descs := []metricDescriptor{consumption}
 	return &GasMeterCollector{
 		collector: newCollector(interval, targets, descs, get,
 			func(device echonetlite.Device, reading *echonetlite.GasMeter) []prometheus.Metric {
 				host, eoj := device.Host(), device.EOJ().String()
 				return []prometheus.Metric{
-					prometheus.MustNewConstMetric(consumption, prometheus.CounterValue, float64(reading.CumulativeGasConsumption)/1_000, host, eoj),
+					prometheus.MustNewConstMetric(consumption.desc, prometheus.CounterValue, float64(reading.CumulativeGasConsumption)/1_000, host, eoj),
 				}
 			},
 		),

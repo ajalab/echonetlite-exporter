@@ -19,36 +19,40 @@ func NewStorageBatteryCollector(
 	interval time.Duration,
 	targets []echonetlite.Device,
 ) *StorageBatteryCollector {
-	chargeableEnergy := prometheus.NewDesc(
+	chargeableEnergy := newMetricDescriptor(
+		"acChargeableElectricEnergy", "joules", gaugeReading,
 		"echonetlite_storage_battery_ac_chargeable_electric_energy_joules",
 		"AC chargeable electric energy.",
-		deviceLabels, nil,
+		deviceLabels,
 	)
-	dischargeableEnergy := prometheus.NewDesc(
+	dischargeableEnergy := newMetricDescriptor(
+		"acDischargeableElectricEnergy", "joules", gaugeReading,
 		"echonetlite_storage_battery_ac_dischargeable_electric_energy_joules",
 		"AC dischargeable electric energy.",
-		deviceLabels, nil,
+		deviceLabels,
 	)
-	chargingEnergy := prometheus.NewDesc(
+	chargingEnergy := newMetricDescriptor(
+		"acCumulativeChargingElectricEnergy", "joules", cumulativeReading,
 		"echonetlite_storage_battery_ac_charging_electric_energy_joules_total",
 		"AC measured cumulative charging electric energy.",
-		deviceLabels, nil,
+		deviceLabels,
 	)
-	dischargingEnergy := prometheus.NewDesc(
+	dischargingEnergy := newMetricDescriptor(
+		"acCumulativeDischargingElectricEnergy", "joules", cumulativeReading,
 		"echonetlite_storage_battery_ac_discharging_electric_energy_joules_total",
 		"AC measured cumulative discharging electric energy.",
-		deviceLabels, nil,
+		deviceLabels,
 	)
-	descs := []*prometheus.Desc{chargeableEnergy, dischargeableEnergy, chargingEnergy, dischargingEnergy}
+	descs := []metricDescriptor{chargeableEnergy, dischargeableEnergy, chargingEnergy, dischargingEnergy}
 	return &StorageBatteryCollector{
 		collector: newCollector(interval, targets, descs, get,
 			func(device echonetlite.Device, reading *echonetlite.StorageBattery) []prometheus.Metric {
 				host, eoj := device.Host(), device.EOJ().String()
 				return []prometheus.Metric{
-					prometheus.MustNewConstMetric(chargeableEnergy, prometheus.GaugeValue, float64(reading.ACChargeableElectricEnergy)*joulesPerWattHour, host, eoj),
-					prometheus.MustNewConstMetric(dischargeableEnergy, prometheus.GaugeValue, float64(reading.ACDischargeableElectricEnergy)*joulesPerWattHour, host, eoj),
-					prometheus.MustNewConstMetric(chargingEnergy, prometheus.CounterValue, float64(reading.ACCumulativeChargingElectricEnergy)*joulesPerWattHour, host, eoj),
-					prometheus.MustNewConstMetric(dischargingEnergy, prometheus.CounterValue, float64(reading.ACCumulativeDischargingElectricEnergy)*joulesPerWattHour, host, eoj),
+					prometheus.MustNewConstMetric(chargeableEnergy.desc, prometheus.GaugeValue, float64(reading.ACChargeableElectricEnergy)*joulesPerWattHour, host, eoj),
+					prometheus.MustNewConstMetric(dischargeableEnergy.desc, prometheus.GaugeValue, float64(reading.ACDischargeableElectricEnergy)*joulesPerWattHour, host, eoj),
+					prometheus.MustNewConstMetric(chargingEnergy.desc, prometheus.CounterValue, float64(reading.ACCumulativeChargingElectricEnergy)*joulesPerWattHour, host, eoj),
+					prometheus.MustNewConstMetric(dischargingEnergy.desc, prometheus.CounterValue, float64(reading.ACCumulativeDischargingElectricEnergy)*joulesPerWattHour, host, eoj),
 				}
 			},
 		),

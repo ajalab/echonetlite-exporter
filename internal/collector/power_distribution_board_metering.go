@@ -21,18 +21,20 @@ func NewPowerDistributionBoardMeteringCollector(
 	targets []echonetlite.Device,
 ) *PowerDistributionBoardMeteringCollector {
 	labels := []string{"host", "eoj", "channel"}
-	power := prometheus.NewDesc(
-		"echonetlite_power_distribution_board_metering_electric_power_simplex_watts",
+	power := newMetricDescriptor(
+		"instantaneousElectricPowerListSimplex", "watts", instantaneousReading,
+		"echonetlite_power_distribution_board_metering_electric_power_list_simplex_watts",
 		"Measured instantaneous power consumption list (simplex).",
-		labels, nil,
+		labels,
 	)
-	energy := prometheus.NewDesc(
-		"echonetlite_power_distribution_board_metering_electric_energy_simplex_joules_total",
+	energy := newMetricDescriptor(
+		"cumulativeElectricEnergyListSimplex", "joules", cumulativeReading,
+		"echonetlite_power_distribution_board_metering_electric_energy_list_simplex_joules_total",
 		"Measured cumulative amount of electric power consumption list (simplex).",
-		labels, nil,
+		labels,
 	)
 	return &PowerDistributionBoardMeteringCollector{
-		collector: newCollector(interval, targets, []*prometheus.Desc{power, energy}, get,
+		collector: newCollector(interval, targets, []metricDescriptor{power, energy}, get,
 			func(device echonetlite.Device, reading *echonetlite.PowerDistributionBoardMetering) []prometheus.Metric {
 				host, eoj := device.Host(), device.EOJ().String()
 				var metrics []prometheus.Metric
@@ -40,7 +42,7 @@ func NewPowerDistributionBoardMeteringCollector(
 				for i, value := range powers.InstantaneousElectricPower {
 					if value != nil {
 						channel := strconv.Itoa(int(powers.StartChannel) + i)
-						metrics = append(metrics, prometheus.MustNewConstMetric(power, prometheus.GaugeValue, float64(*value), host, eoj, channel))
+						metrics = append(metrics, prometheus.MustNewConstMetric(power.desc, prometheus.GaugeValue, float64(*value), host, eoj, channel))
 					}
 				}
 				energies := reading.CumulativeElectricEnergyListSimplex
@@ -48,7 +50,7 @@ func NewPowerDistributionBoardMeteringCollector(
 				for i, value := range energies.ElectricEnergy {
 					if value != nil {
 						channel := strconv.Itoa(int(energies.StartChannel) + i)
-						metrics = append(metrics, prometheus.MustNewConstMetric(energy, prometheus.CounterValue, float64(*value)*scale, host, eoj, channel))
+						metrics = append(metrics, prometheus.MustNewConstMetric(energy.desc, prometheus.CounterValue, float64(*value)*scale, host, eoj, channel))
 					}
 				}
 				return metrics

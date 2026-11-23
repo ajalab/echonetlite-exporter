@@ -14,7 +14,7 @@ import (
 type collector struct {
 	interval time.Duration
 	targets  []echonetlite.Device
-	descs    []*prometheus.Desc
+	descs    []metricDescriptor
 	read     func(context.Context, echonetlite.Device) ([]prometheus.Metric, error)
 
 	successDescs map[echonetlite.Device]*prometheus.Desc
@@ -28,6 +28,32 @@ type deviceMetrics struct {
 	success prometheus.Metric
 }
 
+type metricReading int
+
+const (
+	// gaugeReading covers values such as states and settings without a reading qualifier.
+	gaugeReading metricReading = iota
+	instantaneousReading
+	cumulativeReading
+)
+
+// metricDescriptor associates a Prometheus descriptor with the ECHONET Lite property it exports.
+type metricDescriptor struct {
+	desc              *prometheus.Desc
+	propertyShortName string
+	unit              string
+	reading           metricReading
+}
+
+func newMetricDescriptor(propertyShortName, unit string, reading metricReading, name, help string, labels []string) metricDescriptor {
+	return metricDescriptor{
+		desc:              prometheus.NewDesc(name, help, labels, nil),
+		propertyShortName: propertyShortName,
+		unit:              unit,
+		reading:           reading,
+	}
+}
+
 var deviceLabels = []string{"host", "eoj"}
 
 const (
@@ -38,7 +64,7 @@ const (
 func newCollector[T any](
 	interval time.Duration,
 	targets []echonetlite.Device,
-	descs []*prometheus.Desc,
+	descs []metricDescriptor,
 	get func(context.Context, string, echonetlite.EOJ) (*T, error),
 	metrics func(echonetlite.Device, *T) []prometheus.Metric,
 ) *collector {
@@ -91,7 +117,7 @@ func (c *collector) Describe(ch chan<- *prometheus.Desc) {
 		ch <- desc
 	}
 	for _, desc := range c.descs {
-		ch <- desc
+		ch <- desc.desc
 	}
 }
 
