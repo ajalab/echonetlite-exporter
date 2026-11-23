@@ -20,16 +20,16 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - name: Checkout
-        uses: actions/checkout@v7
+        uses: actions/checkout@v7.0.1
       - name: Build Go
         id: build
-        uses: ./.github/actions/build-go/
+        uses: $/.github/actions/build-go/
         env:
           GOOS: ${{ matrix.os }}
           GOARCH: ${{ matrix.arch }}
           CGO_ENABLED: 0
       - name: Upload release asset as artifact
-        uses: ./.github/actions/upload-artifact-release-asset
+        uses: $/.github/actions/upload-artifact-release-asset
         with:
           path: >
             ${{ steps.build.outputs.target }}
@@ -44,7 +44,7 @@ jobs:
       contents: write
     steps:
       - name: Download assets
-        uses: actions/download-artifact@v8
+        uses: actions/download-artifact@v8.0.2
         with:
           path: assets
           merge-multiple: true
