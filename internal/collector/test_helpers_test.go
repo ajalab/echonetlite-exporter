@@ -15,6 +15,11 @@ import (
 type testCollector interface {
 	prometheus.Collector
 	collect(context.Context)
+	metricDescriptors() []metricDescriptor
+}
+
+func (c *collector) metricDescriptors() []metricDescriptor {
+	return c.descs
 }
 
 func assertPublishedMetrics[T any, C testCollector](
@@ -38,6 +43,9 @@ echonetlite_collector_success{eoj=%q,host=%q} 1
 `, device.EOJ().String(), device.Host())
 	registry := prometheus.NewPedanticRegistry()
 	registry.MustRegister(c)
+	t.Run("MRAConventions", func(t *testing.T) {
+		assertMRAMetricConventions(t, registry, class, c.metricDescriptors())
+	})
 	if err := testutil.GatherAndCompare(registry, strings.NewReader(wantSuccess+want)); err != nil {
 		t.Fatal(err)
 	}

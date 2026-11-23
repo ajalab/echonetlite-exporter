@@ -53,7 +53,7 @@ func TestCollectorRetainsFailedReadAndReplacesSuccessfulRead(t *testing.T) {
 	firstValue, secondValue := new(float64(0)), new(float64(42))
 	var firstErr error
 	valueDesc := prometheus.NewDesc("test_reading", "Test reading.", deviceLabels, nil)
-	c := newCollector(time.Second, []echonetlite.Device{first, second}, []*prometheus.Desc{valueDesc},
+	c := newCollector(time.Second, []echonetlite.Device{first, second}, []metricDescriptor{{desc: valueDesc}},
 		func(_ context.Context, _ string, eoj echonetlite.EOJ) (*reading, error) {
 			if eoj == first.EOJ() {
 				return &reading{value: firstValue}, firstErr

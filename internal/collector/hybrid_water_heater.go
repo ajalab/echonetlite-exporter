@@ -19,58 +19,64 @@ func NewHybridWaterHeaterCollector(
 	interval time.Duration,
 	targets []echonetlite.Device,
 ) *HybridWaterHeaterCollector {
-	solarLinkage := prometheus.NewDesc(
+	solarLinkage := newMetricDescriptor(
+		"linkageModeForSolarPowerGeneration", "", gaugeReading,
 		"echonetlite_hybrid_water_heater_linkage_mode_for_solar_power_generation",
 		"Linkage mode setting for solar power generation.",
-		deviceLabels, nil,
+		deviceLabels,
 	)
-	waterHeating := prometheus.NewDesc(
+	waterHeating := newMetricDescriptor(
+		"waterHeatingStatus", "", gaugeReading,
 		"echonetlite_hybrid_water_heater_water_heating_status",
 		"Water heating status.",
-		deviceLabels, nil,
+		deviceLabels,
 	)
-	heater := prometheus.NewDesc(
+	heater := newMetricDescriptor(
+		"heaterStatus", "", gaugeReading,
 		"echonetlite_hybrid_water_heater_heater_status",
 		"Heater status.",
-		deviceLabels, nil,
+		deviceLabels,
 	)
-	hotWaterSupply := prometheus.NewDesc(
+	hotWaterSupply := newMetricDescriptor(
+		"hotWaterSupplyStatus", "", gaugeReading,
 		"echonetlite_hybrid_water_heater_hot_water_supply_status",
 		"Hot water supply status.",
-		deviceLabels, nil,
+		deviceLabels,
 	)
-	remainingWater := prometheus.NewDesc(
+	remainingWater := newMetricDescriptor(
+		"remainingWater", "cubic_meters", gaugeReading,
 		"echonetlite_hybrid_water_heater_remaining_water_cubic_meters",
 		"Measured amount of hot water remaining in tank.",
-		deviceLabels, nil,
+		deviceLabels,
 	)
-	tankCapacity := prometheus.NewDesc(
+	tankCapacity := newMetricDescriptor(
+		"tankCapacity", "cubic_meters", gaugeReading,
 		"echonetlite_hybrid_water_heater_tank_capacity_cubic_meters",
 		"Tank capacity.",
-		deviceLabels, nil,
+		deviceLabels,
 	)
-	descs := []*prometheus.Desc{solarLinkage, waterHeating, heater, hotWaterSupply, remainingWater, tankCapacity}
+	descs := []metricDescriptor{solarLinkage, waterHeating, heater, hotWaterSupply, remainingWater, tankCapacity}
 	return &HybridWaterHeaterCollector{
 		collector: newCollector(interval, targets, descs, get,
 			func(device echonetlite.Device, reading *echonetlite.HybridWaterHeater) []prometheus.Metric {
 				host, eoj := device.Host(), device.EOJ().String()
 				metrics := []prometheus.Metric{
-					prometheus.MustNewConstMetric(solarLinkage, prometheus.GaugeValue, float64(reading.LinkageModeForSolarPowerGeneration), host, eoj),
+					prometheus.MustNewConstMetric(solarLinkage.desc, prometheus.GaugeValue, float64(reading.LinkageModeForSolarPowerGeneration), host, eoj),
 				}
 				if reading.WaterHeatingStatus != nil {
-					metrics = append(metrics, prometheus.MustNewConstMetric(waterHeating, prometheus.GaugeValue, boolValue(*reading.WaterHeatingStatus), host, eoj))
+					metrics = append(metrics, prometheus.MustNewConstMetric(waterHeating.desc, prometheus.GaugeValue, boolValue(*reading.WaterHeatingStatus), host, eoj))
 				}
 				if reading.HeaterStatus != nil {
-					metrics = append(metrics, prometheus.MustNewConstMetric(heater, prometheus.GaugeValue, boolValue(*reading.HeaterStatus), host, eoj))
+					metrics = append(metrics, prometheus.MustNewConstMetric(heater.desc, prometheus.GaugeValue, boolValue(*reading.HeaterStatus), host, eoj))
 				}
 				if reading.HotWaterSupplyStatus != nil {
-					metrics = append(metrics, prometheus.MustNewConstMetric(hotWaterSupply, prometheus.GaugeValue, boolValue(*reading.HotWaterSupplyStatus), host, eoj))
+					metrics = append(metrics, prometheus.MustNewConstMetric(hotWaterSupply.desc, prometheus.GaugeValue, boolValue(*reading.HotWaterSupplyStatus), host, eoj))
 				}
 				if reading.RemainingWater != nil {
-					metrics = append(metrics, prometheus.MustNewConstMetric(remainingWater, prometheus.GaugeValue, float64(*reading.RemainingWater)/1_000, host, eoj))
+					metrics = append(metrics, prometheus.MustNewConstMetric(remainingWater.desc, prometheus.GaugeValue, float64(*reading.RemainingWater)/1_000, host, eoj))
 				}
 				if reading.TankCapacity != nil {
-					metrics = append(metrics, prometheus.MustNewConstMetric(tankCapacity, prometheus.GaugeValue, float64(*reading.TankCapacity)/1_000, host, eoj))
+					metrics = append(metrics, prometheus.MustNewConstMetric(tankCapacity.desc, prometheus.GaugeValue, float64(*reading.TankCapacity)/1_000, host, eoj))
 				}
 				return metrics
 			},

@@ -21,8 +21,30 @@ runs:
         key: go-${{ hashFiles('go.sum') }}
         restore-keys: |
           go-
+    - name: Restore MRA cache
+      id: mra-cache
+      uses: actions/cache/restore@v4
+      with:
+        path: third_party/echonet-lite-mra/MRA_v*/
+        key: echonet-lite-mra-${{ runner.os }}-${{ hashFiles('third_party/echonet-lite-mra/fetch.sh') }}
+    - name: Fetch MRA
+      id: fetch-mra
+      run: |
+        mra_dir="$(./third_party/echonet-lite-mra/fetch.sh)"
+        printf 'path=%s\n' "$mra_dir" >> "$GITHUB_OUTPUT"
+      shell: bash
+    - name: Save MRA cache
+      if: steps.mra-cache.outputs.cache-hit != 'true'
+      uses: actions/cache/save@v4
+      with:
+        path: third_party/echonet-lite-mra/MRA_v*/
+        key: ${{ steps.mra-cache.outputs.cache-primary-key }}
     - name: Test
-      run: go test ./... -json > test-result.json
+      run: |
+        set -e -o pipefail
+        go test ./... -json | tee test-result.json
+      env:
+        ECHONETLITE_MRA_DIR: ${{ steps.fetch-mra.outputs.path }}
       shell: bash
     - name: Upload Go test results
       uses: actions/upload-artifact@v4

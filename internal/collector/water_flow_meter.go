@@ -19,18 +19,19 @@ func NewWaterFlowMeterCollector(
 	interval time.Duration,
 	targets []echonetlite.Device,
 ) *WaterFlowMeterCollector {
-	flow := prometheus.NewDesc(
+	flow := newMetricDescriptor(
+		"cumulativeFlowingWater", "cubic_meters", cumulativeReading,
 		"echonetlite_water_flow_meter_flowing_water_cubic_meters_total",
 		"Measured cumulative amount of flowing water.",
-		deviceLabels, nil,
+		deviceLabels,
 	)
-	descs := []*prometheus.Desc{flow}
+	descs := []metricDescriptor{flow}
 	return &WaterFlowMeterCollector{
 		collector: newCollector(interval, targets, descs, get,
 			func(device echonetlite.Device, reading *echonetlite.WaterFlowMeter) []prometheus.Metric {
 				host, eoj := device.Host(), device.EOJ().String()
 				return []prometheus.Metric{
-					prometheus.MustNewConstMetric(flow, prometheus.CounterValue, float64(reading.CumulativeFlowingWater)*reading.UnitForCumulativeFlowingWater, host, eoj),
+					prometheus.MustNewConstMetric(flow.desc, prometheus.CounterValue, float64(reading.CumulativeFlowingWater)*reading.UnitForCumulativeFlowingWater, host, eoj),
 				}
 			},
 		),
