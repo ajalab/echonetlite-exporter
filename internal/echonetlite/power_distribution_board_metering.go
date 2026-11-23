@@ -6,8 +6,8 @@ import (
 )
 
 const (
-	epcCumulativeElectricEnergyListSimplex   = 0xB3
-	epcInstantaneousElectricPowerListSimplex = 0xB7
+	EPCCumulativeElectricEnergyListSimplex   = 0xB3
+	EPCInstantaneousElectricPowerListSimplex = 0xB7
 	epcUnitForCumulativeElectricEnergy       = 0xC2
 )
 
@@ -50,20 +50,20 @@ func (p *PowerDistributionBoardMeteringClient) Get(ctx context.Context, host str
 		return nil, fmt.Errorf("unitForCumulativeElectricEnergy (EPC 0xC2): %w", err)
 	}
 	values, err := read.optionalIndividually(ctx, supportedEPCs(supported,
-		epcCumulativeElectricEnergyListSimplex, epcInstantaneousElectricPowerListSimplex))
+		EPCCumulativeElectricEnergyListSimplex, EPCInstantaneousElectricPowerListSimplex))
 	if err != nil {
 		return nil, err
 	}
 
 	reading := &PowerDistributionBoardMetering{UnitForCumulativeElectricEnergy: unit}
-	if edt := values[epcCumulativeElectricEnergyListSimplex]; len(edt) != 0 {
+	if edt := values[EPCCumulativeElectricEnergyListSimplex]; len(edt) != 0 {
 		start, entries, err := decodeChannelList(edt, noEnergyData, decodeChannelEnergy)
 		if err != nil {
 			return nil, fmt.Errorf("cumulativeElectricEnergyListSimplex (EPC 0xB3): %w", err)
 		}
 		reading.CumulativeElectricEnergyListSimplex = CumulativeElectricEnergyListSimplex{StartChannel: start, ElectricEnergy: entries}
 	}
-	if edt := values[epcInstantaneousElectricPowerListSimplex]; len(edt) != 0 {
+	if edt := values[EPCInstantaneousElectricPowerListSimplex]; len(edt) != 0 {
 		start, entries, err := decodeChannelList(edt, noPowerData, decodeElectricPower)
 		if err != nil {
 			return nil, fmt.Errorf("instantaneousElectricPowerListSimplex (EPC 0xB7): %w", err)

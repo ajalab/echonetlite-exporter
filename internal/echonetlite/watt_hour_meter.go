@@ -7,7 +7,7 @@ import (
 )
 
 const (
-	epcCumulativeElectricEnergy                  = 0xE0
+	EPCCumulativeElectricEnergy                  = 0xE0
 	epcWattHourMeterCumulativeElectricEnergyUnit = 0xE2
 )
 
@@ -26,11 +26,11 @@ func NewWattHourMeterClient(conn *Connection) *WattHourMeterClient {
 
 func (c *WattHourMeterClient) Get(ctx context.Context, host string, eoj EOJ) (*WattHourMeter, error) {
 	read := propertyReader{conn: c.conn, host: host, eoj: eoj}
-	values, err := read.required(ctx, epcCumulativeElectricEnergy, epcWattHourMeterCumulativeElectricEnergyUnit)
+	values, err := read.required(ctx, EPCCumulativeElectricEnergy, epcWattHourMeterCumulativeElectricEnergyUnit)
 	if err != nil {
 		return nil, err
 	}
-	energy, err := decodeMeterValue(values[epcCumulativeElectricEnergy], 99_999_999)
+	energy, err := decodeMeterValue(values[EPCCumulativeElectricEnergy], 99_999_999)
 	if err != nil {
 		return nil, fmt.Errorf("invalid cumulativeElectricEnergy: %w", err)
 	}

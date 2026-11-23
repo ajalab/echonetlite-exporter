@@ -12,13 +12,13 @@ func TestMultipleInputPCSCollectorPublishesMetrics(t *testing.T) {
 		InstantaneousElectricPower: -100,
 	}
 	const want = `
-# HELP echonetlite_multiple_input_pcs_electric_power_watts Measured instantaneous electric power.
+# HELP echonetlite_multiple_input_pcs_electric_power_watts Measured instantaneous electric power. EPC=0xE7
 # TYPE echonetlite_multiple_input_pcs_electric_power_watts gauge
 echonetlite_multiple_input_pcs_electric_power_watts{eoj="02A501",host="192.0.2.10"} -100
-# HELP echonetlite_multiple_input_pcs_normal_direction_electric_energy_joules_total Measured cumulative amount of electric energy (normal direction).
+# HELP echonetlite_multiple_input_pcs_normal_direction_electric_energy_joules_total Measured cumulative amount of electric energy (normal direction). EPC=0xE0
 # TYPE echonetlite_multiple_input_pcs_normal_direction_electric_energy_joules_total counter
 echonetlite_multiple_input_pcs_normal_direction_electric_energy_joules_total{eoj="02A501",host="192.0.2.10"} 36000
-# HELP echonetlite_multiple_input_pcs_reverse_direction_electric_energy_joules_total Measured cumulative amount of electric energy (reverse direction).
+# HELP echonetlite_multiple_input_pcs_reverse_direction_electric_energy_joules_total Measured cumulative amount of electric energy (reverse direction). EPC=0xE3
 # TYPE echonetlite_multiple_input_pcs_reverse_direction_electric_energy_joules_total counter
 echonetlite_multiple_input_pcs_reverse_direction_electric_energy_joules_total{eoj="02A501",host="192.0.2.10"} 72000
 `

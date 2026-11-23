@@ -22,15 +22,17 @@ func NewPowerDistributionBoardMeteringCollector(
 ) *PowerDistributionBoardMeteringCollector {
 	labels := []string{"host", "eoj", "channel"}
 	power := newMetricDescriptor(
+		echonetlite.EPCInstantaneousElectricPowerListSimplex,
 		"instantaneousElectricPowerListSimplex", "watts", instantaneousReading,
 		"echonetlite_power_distribution_board_metering_electric_power_list_simplex_watts",
-		"Measured instantaneous power consumption list (simplex).",
+		"Measured instantaneous power consumption list (simplex)",
 		labels,
 	)
 	energy := newMetricDescriptor(
+		echonetlite.EPCCumulativeElectricEnergyListSimplex,
 		"cumulativeElectricEnergyListSimplex", "joules", cumulativeReading,
 		"echonetlite_power_distribution_board_metering_electric_energy_list_simplex_joules_total",
-		"Measured cumulative amount of electric power consumption list (simplex).",
+		"Measured cumulative amount of electric power consumption list (simplex)",
 		labels,
 	)
 	return &PowerDistributionBoardMeteringCollector{

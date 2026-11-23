@@ -20,9 +20,10 @@ func NewWattHourMeterCollector(
 	targets []echonetlite.Device,
 ) *WattHourMeterCollector {
 	energy := newMetricDescriptor(
+		echonetlite.EPCCumulativeElectricEnergy,
 		"cumulativeElectricEnergy", "joules", cumulativeReading,
 		"echonetlite_watt_hour_meter_electric_energy_joules_total",
-		"Cumulative amounts of electric energy measurement value.",
+		"Cumulative amounts of electric energy measurement value",
 		deviceLabels,
 	)
 	descs := []metricDescriptor{energy}

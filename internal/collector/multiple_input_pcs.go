@@ -20,21 +20,24 @@ func NewMultipleInputPCSCollector(
 	targets []echonetlite.Device,
 ) *MultipleInputPCSCollector {
 	power := newMetricDescriptor(
+		echonetlite.EPCMultipleInputPCSInstantaneousElectricPower,
 		"instantaneousElectricPower", "watts", instantaneousReading,
 		"echonetlite_multiple_input_pcs_electric_power_watts",
-		"Measured instantaneous electric power.",
+		"Measured instantaneous electric power",
 		deviceLabels,
 	)
 	normalEnergy := newMetricDescriptor(
+		echonetlite.EPCMultipleInputPCSNormalDirectionElectricEnergy,
 		"normalDirectionElectricEnergy", "joules", cumulativeReading,
 		"echonetlite_multiple_input_pcs_normal_direction_electric_energy_joules_total",
-		"Measured cumulative amount of electric energy (normal direction).",
+		"Measured cumulative amount of electric energy (normal direction)",
 		deviceLabels,
 	)
 	reverseEnergy := newMetricDescriptor(
+		echonetlite.EPCMultipleInputPCSReverseDirectionElectricEnergy,
 		"reverseDirectionElectricEnergy", "joules", cumulativeReading,
 		"echonetlite_multiple_input_pcs_reverse_direction_electric_energy_joules_total",
-		"Measured cumulative amount of electric energy (reverse direction).",
+		"Measured cumulative amount of electric energy (reverse direction)",
 		deviceLabels,
 	)
 	descs := []metricDescriptor{power, normalEnergy, reverseEnergy}

@@ -8,8 +8,8 @@ import (
 )
 
 const (
-	epcInstantaneousElectricPowerGeneration = 0xE0
-	epcCumulativeElectricEnergyOfGeneration = 0xE1
+	EPCInstantaneousElectricPowerGeneration = 0xE0
+	EPCCumulativeElectricEnergyOfGeneration = 0xE1
 )
 
 type PVPowerGenerationClient struct {
@@ -25,21 +25,21 @@ func NewPVPowerGenerationClient(conn *Connection) *PVPowerGenerationClient {
 func (p *PVPowerGenerationClient) Get(ctx context.Context, host string, eoj EOJ) (*PVPowerGeneration, error) {
 	read := propertyReader{conn: p.conn, host: host, eoj: eoj, minimumWait: 20 * time.Second}
 	values, err := read.required(ctx,
-		epcInstantaneousElectricPowerGeneration,
-		epcCumulativeElectricEnergyOfGeneration,
+		EPCInstantaneousElectricPowerGeneration,
+		EPCCumulativeElectricEnergyOfGeneration,
 	)
 	if err != nil {
 		return nil, err
 	}
 
 	reading := &PVPowerGeneration{}
-	reading.InstantaneousElectricPowerGeneration, err = decodeInstantaneousElectricPowerGeneration(values[epcInstantaneousElectricPowerGeneration])
+	reading.InstantaneousElectricPowerGeneration, err = decodeInstantaneousElectricPowerGeneration(values[EPCInstantaneousElectricPowerGeneration])
 	if err != nil {
-		return nil, fmt.Errorf("instantaneousElectricPowerGeneration (EPC 0x%02X): %w", epcInstantaneousElectricPowerGeneration, err)
+		return nil, fmt.Errorf("instantaneousElectricPowerGeneration (EPC 0x%02X): %w", EPCInstantaneousElectricPowerGeneration, err)
 	}
-	reading.CumulativeElectricEnergyOfGeneration, err = decodeMeterValue(values[epcCumulativeElectricEnergyOfGeneration], 999_999_999)
+	reading.CumulativeElectricEnergyOfGeneration, err = decodeMeterValue(values[EPCCumulativeElectricEnergyOfGeneration], 999_999_999)
 	if err != nil {
-		return nil, fmt.Errorf("cumulativeElectricEnergyOfGeneration (EPC 0x%02X): %w", epcCumulativeElectricEnergyOfGeneration, err)
+		return nil, fmt.Errorf("cumulativeElectricEnergyOfGeneration (EPC 0x%02X): %w", EPCCumulativeElectricEnergyOfGeneration, err)
 	}
 	return reading, nil
 }

@@ -20,39 +20,45 @@ func NewHybridWaterHeaterCollector(
 	targets []echonetlite.Device,
 ) *HybridWaterHeaterCollector {
 	solarLinkage := newMetricDescriptor(
+		echonetlite.EPCLinkageModeForSolarPowerGeneration,
 		"linkageModeForSolarPowerGeneration", "", gaugeReading,
 		"echonetlite_hybrid_water_heater_linkage_mode_for_solar_power_generation",
-		"Linkage mode setting for solar power generation.",
+		"Linkage mode setting for solar power generation",
 		deviceLabels,
 	)
 	waterHeating := newMetricDescriptor(
+		echonetlite.EPCWaterHeatingStatus,
 		"waterHeatingStatus", "", gaugeReading,
 		"echonetlite_hybrid_water_heater_water_heating_status",
-		"Water heating status.",
+		"Water heating status",
 		deviceLabels,
 	)
 	heater := newMetricDescriptor(
+		echonetlite.EPCHeaterStatus,
 		"heaterStatus", "", gaugeReading,
 		"echonetlite_hybrid_water_heater_heater_status",
-		"Heater status.",
+		"Heater status",
 		deviceLabels,
 	)
 	hotWaterSupply := newMetricDescriptor(
+		echonetlite.EPCHotWaterSupplyStatus,
 		"hotWaterSupplyStatus", "", gaugeReading,
 		"echonetlite_hybrid_water_heater_hot_water_supply_status",
-		"Hot water supply status.",
+		"Hot water supply status",
 		deviceLabels,
 	)
 	remainingWater := newMetricDescriptor(
+		echonetlite.EPCRemainingWater,
 		"remainingWater", "cubic_meters", gaugeReading,
 		"echonetlite_hybrid_water_heater_remaining_water_cubic_meters",
-		"Measured amount of hot water remaining in tank.",
+		"Measured amount of hot water remaining in tank",
 		deviceLabels,
 	)
 	tankCapacity := newMetricDescriptor(
+		echonetlite.EPCTankCapacity,
 		"tankCapacity", "cubic_meters", gaugeReading,
 		"echonetlite_hybrid_water_heater_tank_capacity_cubic_meters",
-		"Tank capacity.",
+		"Tank capacity",
 		deviceLabels,
 	)
 	descs := []metricDescriptor{solarLinkage, waterHeating, heater, hotWaterSupply, remainingWater, tankCapacity}

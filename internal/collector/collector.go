@@ -2,6 +2,7 @@ package collector
 
 import (
 	"context"
+	"fmt"
 	"log/slog"
 	"sync"
 	"time"
@@ -45,7 +46,8 @@ type metricDescriptor struct {
 	reading           metricReading
 }
 
-func newMetricDescriptor(propertyShortName, unit string, reading metricReading, name, help string, labels []string) metricDescriptor {
+func newMetricDescriptor(epc uint8, propertyShortName, unit string, reading metricReading, name, propertyNameEN string, labels []string) metricDescriptor {
+	help := fmt.Sprintf("%s. EPC=0x%02X", propertyNameEN, epc)
 	return metricDescriptor{
 		desc:              prometheus.NewDesc(name, help, labels, nil),
 		propertyShortName: propertyShortName,

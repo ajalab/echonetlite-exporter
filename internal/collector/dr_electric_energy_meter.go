@@ -20,33 +20,38 @@ func NewDRElectricEnergyMeterCollector(
 	targets []echonetlite.Device,
 ) *DRElectricEnergyMeterCollector {
 	acPower := newMetricDescriptor(
+		echonetlite.EPCDRElectricEnergyMeterACInstantaneousElectricPower,
 		"acInstantaneousElectricPower", "watts", instantaneousReading,
 		"echonetlite_dr_electric_energy_meter_ac_electric_power_watts",
-		"Measured instantaneous electric power (AC input/output).",
+		"Measured instantaneous electric power (AC input/output)",
 		deviceLabels,
 	)
 	independentPower := newMetricDescriptor(
+		echonetlite.EPCDRElectricEnergyMeterIndependentOperationInstantaneousElectricPower,
 		"independentOperationInstantaneousElectricPower", "watts", instantaneousReading,
 		"echonetlite_dr_electric_energy_meter_independent_operation_electric_power_watts",
-		"Measured instantaneous electric power (output during a power outage).",
+		"Measured instantaneous electric power (output during a power outage)",
 		deviceLabels,
 	)
 	inputEnergy := newMetricDescriptor(
+		echonetlite.EPCDRElectricEnergyMeterACInputCumulativeElectricEnergy,
 		"acInputCumulativeElectricEnergy", "joules", cumulativeReading,
 		"echonetlite_dr_electric_energy_meter_ac_input_electric_energy_joules_total",
-		"Measured cumulative amounts of electric energy (AC input).",
+		"Measured cumulative amounts of electric energy (AC input)",
 		deviceLabels,
 	)
 	outputEnergy := newMetricDescriptor(
+		echonetlite.EPCDRElectricEnergyMeterACOutputCumulativeElectricEnergy,
 		"acOutputCumulativeElectricEnergy", "joules", cumulativeReading,
 		"echonetlite_dr_electric_energy_meter_ac_output_electric_energy_joules_total",
-		"Measured cumulative amounts of electric energy (AC output).",
+		"Measured cumulative amounts of electric energy (AC output)",
 		deviceLabels,
 	)
 	independentEnergy := newMetricDescriptor(
+		echonetlite.EPCDRElectricEnergyMeterIndependentOperationCumulativeElectricEnergy,
 		"independentOperationCumulativeElectricEnergy", "joules", cumulativeReading,
 		"echonetlite_dr_electric_energy_meter_independent_operation_electric_energy_joules_total",
-		"Measured cumulative amounts of electric energy (output during a power outage).",
+		"Measured cumulative amounts of electric energy (output during a power outage)",
 		deviceLabels,
 	)
 	descs := []metricDescriptor{acPower, independentPower, inputEnergy, outputEnergy, independentEnergy}

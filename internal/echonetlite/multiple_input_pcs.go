@@ -6,9 +6,9 @@ import (
 )
 
 const (
-	epcMultipleInputPCSNormalDirectionElectricEnergy  = 0xE0
-	epcMultipleInputPCSReverseDirectionElectricEnergy = 0xE3
-	epcMultipleInputPCSInstantaneousElectricPower     = 0xE7
+	EPCMultipleInputPCSNormalDirectionElectricEnergy  = 0xE0
+	EPCMultipleInputPCSReverseDirectionElectricEnergy = 0xE3
+	EPCMultipleInputPCSInstantaneousElectricPower     = 0xE7
 )
 
 type MultipleInputPCSClient struct {
@@ -22,26 +22,26 @@ func NewMultipleInputPCSClient(conn *Connection) *MultipleInputPCSClient {
 func (c *MultipleInputPCSClient) Get(ctx context.Context, host string, eoj EOJ) (*MultipleInputPCS, error) {
 	read := propertyReader{conn: c.conn, host: host, eoj: eoj}
 	values, err := read.required(ctx,
-		epcMultipleInputPCSNormalDirectionElectricEnergy,
-		epcMultipleInputPCSReverseDirectionElectricEnergy,
-		epcMultipleInputPCSInstantaneousElectricPower,
+		EPCMultipleInputPCSNormalDirectionElectricEnergy,
+		EPCMultipleInputPCSReverseDirectionElectricEnergy,
+		EPCMultipleInputPCSInstantaneousElectricPower,
 	)
 	if err != nil {
 		return nil, err
 	}
 
 	reading := &MultipleInputPCS{}
-	reading.NormalDirectionElectricEnergy, err = decodeMeterValue(values[epcMultipleInputPCSNormalDirectionElectricEnergy], 999_999_999)
+	reading.NormalDirectionElectricEnergy, err = decodeMeterValue(values[EPCMultipleInputPCSNormalDirectionElectricEnergy], 999_999_999)
 	if err != nil {
-		return nil, fmt.Errorf("normalDirectionElectricEnergy (EPC 0x%02X): %w", epcMultipleInputPCSNormalDirectionElectricEnergy, err)
+		return nil, fmt.Errorf("normalDirectionElectricEnergy (EPC 0x%02X): %w", EPCMultipleInputPCSNormalDirectionElectricEnergy, err)
 	}
-	reading.ReverseDirectionElectricEnergy, err = decodeMeterValue(values[epcMultipleInputPCSReverseDirectionElectricEnergy], 999_999_999)
+	reading.ReverseDirectionElectricEnergy, err = decodeMeterValue(values[EPCMultipleInputPCSReverseDirectionElectricEnergy], 999_999_999)
 	if err != nil {
-		return nil, fmt.Errorf("reverseDirectionElectricEnergy (EPC 0x%02X): %w", epcMultipleInputPCSReverseDirectionElectricEnergy, err)
+		return nil, fmt.Errorf("reverseDirectionElectricEnergy (EPC 0x%02X): %w", EPCMultipleInputPCSReverseDirectionElectricEnergy, err)
 	}
-	reading.InstantaneousElectricPower, err = decodeElectricPower(values[epcMultipleInputPCSInstantaneousElectricPower])
+	reading.InstantaneousElectricPower, err = decodeElectricPower(values[EPCMultipleInputPCSInstantaneousElectricPower])
 	if err != nil {
-		return nil, fmt.Errorf("instantaneousElectricPower (EPC 0x%02X): %w", epcMultipleInputPCSInstantaneousElectricPower, err)
+		return nil, fmt.Errorf("instantaneousElectricPower (EPC 0x%02X): %w", EPCMultipleInputPCSInstantaneousElectricPower, err)
 	}
 	return reading, nil
 }

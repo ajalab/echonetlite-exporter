@@ -7,10 +7,10 @@ import (
 )
 
 const (
-	epcACChargeableElectricEnergy            = 0xA4
-	epcACDischargeableElectricEnergy         = 0xA5
-	epcACCumulativeChargingElectricEnergy    = 0xA8
-	epcACCumulativeDischargingElectricEnergy = 0xA9
+	EPCACChargeableElectricEnergy            = 0xA4
+	EPCACDischargeableElectricEnergy         = 0xA5
+	EPCACCumulativeChargingElectricEnergy    = 0xA8
+	EPCACCumulativeDischargingElectricEnergy = 0xA9
 )
 
 type StorageBatteryClient struct {
@@ -26,31 +26,31 @@ func NewStorageBatteryClient(conn *Connection) *StorageBatteryClient {
 func (s *StorageBatteryClient) Get(ctx context.Context, host string, eoj EOJ) (*StorageBattery, error) {
 	read := propertyReader{conn: s.conn, host: host, eoj: eoj, minimumWait: 20 * time.Second}
 	values, err := read.required(ctx,
-		epcACChargeableElectricEnergy,
-		epcACDischargeableElectricEnergy,
-		epcACCumulativeChargingElectricEnergy,
-		epcACCumulativeDischargingElectricEnergy,
+		EPCACChargeableElectricEnergy,
+		EPCACDischargeableElectricEnergy,
+		EPCACCumulativeChargingElectricEnergy,
+		EPCACCumulativeDischargingElectricEnergy,
 	)
 	if err != nil {
 		return nil, err
 	}
 
 	reading := &StorageBattery{}
-	reading.ACChargeableElectricEnergy, err = decodeMeterValue(values[epcACChargeableElectricEnergy], 999_999_999)
+	reading.ACChargeableElectricEnergy, err = decodeMeterValue(values[EPCACChargeableElectricEnergy], 999_999_999)
 	if err != nil {
-		return nil, fmt.Errorf("acChargeableElectricEnergy (EPC 0x%02X): %w", epcACChargeableElectricEnergy, err)
+		return nil, fmt.Errorf("acChargeableElectricEnergy (EPC 0x%02X): %w", EPCACChargeableElectricEnergy, err)
 	}
-	reading.ACDischargeableElectricEnergy, err = decodeMeterValue(values[epcACDischargeableElectricEnergy], 999_999_999)
+	reading.ACDischargeableElectricEnergy, err = decodeMeterValue(values[EPCACDischargeableElectricEnergy], 999_999_999)
 	if err != nil {
-		return nil, fmt.Errorf("acDischargeableElectricEnergy (EPC 0x%02X): %w", epcACDischargeableElectricEnergy, err)
+		return nil, fmt.Errorf("acDischargeableElectricEnergy (EPC 0x%02X): %w", EPCACDischargeableElectricEnergy, err)
 	}
-	reading.ACCumulativeChargingElectricEnergy, err = decodeMeterValue(values[epcACCumulativeChargingElectricEnergy], 999_999_999)
+	reading.ACCumulativeChargingElectricEnergy, err = decodeMeterValue(values[EPCACCumulativeChargingElectricEnergy], 999_999_999)
 	if err != nil {
-		return nil, fmt.Errorf("acCumulativeChargingElectricEnergy (EPC 0x%02X): %w", epcACCumulativeChargingElectricEnergy, err)
+		return nil, fmt.Errorf("acCumulativeChargingElectricEnergy (EPC 0x%02X): %w", EPCACCumulativeChargingElectricEnergy, err)
 	}
-	reading.ACCumulativeDischargingElectricEnergy, err = decodeMeterValue(values[epcACCumulativeDischargingElectricEnergy], 999_999_999)
+	reading.ACCumulativeDischargingElectricEnergy, err = decodeMeterValue(values[EPCACCumulativeDischargingElectricEnergy], 999_999_999)
 	if err != nil {
-		return nil, fmt.Errorf("acCumulativeDischargingElectricEnergy (EPC 0x%02X): %w", epcACCumulativeDischargingElectricEnergy, err)
+		return nil, fmt.Errorf("acCumulativeDischargingElectricEnergy (EPC 0x%02X): %w", EPCACCumulativeDischargingElectricEnergy, err)
 	}
 	return reading, nil
 }

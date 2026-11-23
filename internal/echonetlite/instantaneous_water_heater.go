@@ -8,14 +8,14 @@ import (
 )
 
 const (
-	epcHotWaterHeatingStatus          = 0xD0
-	epcTargetSuppliedWaterTemperature = 0xD1
-	epcTargetBathWaterTemperature     = 0xE1
-	epcBathWaterHeatingStatus         = 0xE2
-	epcAutomaticBathOperation         = 0xE3
-	epcShowerHotWaterSupplyStatus     = 0xEA
-	epcKitchenHotWaterSupplyStatus    = 0xEB
-	epcBathOperationStatus            = 0xEF
+	EPCHotWaterHeatingStatus          = 0xD0
+	EPCTargetSuppliedWaterTemperature = 0xD1
+	EPCTargetBathWaterTemperature     = 0xE1
+	EPCBathWaterHeatingStatus         = 0xE2
+	EPCAutomaticBathOperation         = 0xE3
+	EPCShowerHotWaterSupplyStatus     = 0xEA
+	EPCKitchenHotWaterSupplyStatus    = 0xEB
+	EPCBathOperationStatus            = 0xEF
 )
 
 type InstantaneousWaterHeater struct {
@@ -45,23 +45,23 @@ func (c *InstantaneousWaterHeaterClient) Get(ctx context.Context, host string, e
 	}
 
 	// AIF §3.1.4 allows these device properties to be read together.
-	values, err := read.group(ctx, []uint8{epcHotWaterHeatingStatus, epcBathWaterHeatingStatus},
-		supportedEPCs(supported, epcAutomaticBathOperation))
+	values, err := read.group(ctx, []uint8{EPCHotWaterHeatingStatus, EPCBathWaterHeatingStatus},
+		supportedEPCs(supported, EPCAutomaticBathOperation))
 	if err != nil {
 		return nil, err
 	}
-	hotWaterHeating, err := decodeHeatingState(values[epcHotWaterHeatingStatus])
+	hotWaterHeating, err := decodeHeatingState(values[EPCHotWaterHeatingStatus])
 	if err != nil {
 		return nil, fmt.Errorf("hotWaterHeatingStatus (EPC 0xD0): %w", err)
 	}
-	bathWaterHeating, err := decodeHeatingState(values[epcBathWaterHeatingStatus])
+	bathWaterHeating, err := decodeHeatingState(values[EPCBathWaterHeatingStatus])
 	if err != nil {
 		return nil, fmt.Errorf("bathWaterHeatingStatus (EPC 0xE2): %w", err)
 	}
 
 	optional, err := read.optionalIndividually(ctx, supportedEPCs(supported,
-		epcTargetSuppliedWaterTemperature, epcTargetBathWaterTemperature,
-		epcShowerHotWaterSupplyStatus, epcKitchenHotWaterSupplyStatus, epcBathOperationStatus))
+		EPCTargetSuppliedWaterTemperature, EPCTargetBathWaterTemperature,
+		EPCShowerHotWaterSupplyStatus, EPCKitchenHotWaterSupplyStatus, EPCBathOperationStatus))
 	if err != nil {
 		return nil, err
 	}
@@ -74,9 +74,9 @@ func (c *InstantaneousWaterHeaterClient) Get(ctx context.Context, host string, e
 		epc  uint8
 		dest **bool
 	}{
-		{epcAutomaticBathOperation, &reading.AutomaticBathOperation},
-		{epcShowerHotWaterSupplyStatus, &reading.ShowerHotWaterSupplyStatus},
-		{epcKitchenHotWaterSupplyStatus, &reading.KitchenHotWaterSupplyStatus},
+		{EPCAutomaticBathOperation, &reading.AutomaticBathOperation},
+		{EPCShowerHotWaterSupplyStatus, &reading.ShowerHotWaterSupplyStatus},
+		{EPCKitchenHotWaterSupplyStatus, &reading.KitchenHotWaterSupplyStatus},
 	} {
 		edt := values[field.epc]
 		if len(edt) == 0 {
@@ -93,9 +93,9 @@ func (c *InstantaneousWaterHeaterClient) Get(ctx context.Context, host string, e
 		min, max uint8
 		dest     **uint8
 	}{
-		{epcTargetSuppliedWaterTemperature, 0, 100, &reading.TargetSuppliedWaterTemperature},
-		{epcTargetBathWaterTemperature, 0, 100, &reading.TargetBathWaterTemperature},
-		{epcBathOperationStatus, 0x41, 0x43, &reading.BathOperationStatus},
+		{EPCTargetSuppliedWaterTemperature, 0, 100, &reading.TargetSuppliedWaterTemperature},
+		{EPCTargetBathWaterTemperature, 0, 100, &reading.TargetBathWaterTemperature},
+		{EPCBathOperationStatus, 0x41, 0x43, &reading.BathOperationStatus},
 	} {
 		edt := values[field.epc]
 		if len(edt) == 0 {

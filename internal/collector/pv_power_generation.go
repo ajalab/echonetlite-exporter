@@ -20,15 +20,17 @@ func NewPVPowerGenerationCollector(
 	targets []echonetlite.Device,
 ) *PVPowerGenerationCollector {
 	power := newMetricDescriptor(
+		echonetlite.EPCInstantaneousElectricPowerGeneration,
 		"instantaneousElectricPowerGeneration", "watts", instantaneousReading,
 		"echonetlite_pv_power_generation_electric_power_generation_watts",
-		"Measured instantaneous amount of electricity generated.",
+		"Measured instantaneous amount of electricity generated",
 		deviceLabels,
 	)
 	energy := newMetricDescriptor(
+		echonetlite.EPCCumulativeElectricEnergyOfGeneration,
 		"cumulativeElectricEnergyOfGeneration", "joules", cumulativeReading,
 		"echonetlite_pv_power_generation_electric_energy_of_generation_joules_total",
-		"Measured cumulative amount of electric energy generated.",
+		"Measured cumulative amount of electric energy generated",
 		deviceLabels,
 	)
 	descs := []metricDescriptor{power, energy}

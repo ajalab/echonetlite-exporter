@@ -11,7 +11,7 @@ func TestWattHourMeterCollectorPublishesMetrics(t *testing.T) {
 		CumulativeElectricEnergy: 100, CumulativeAmountsOfElectricEnergyUnit: 0.01,
 	}
 	const want = `
-# HELP echonetlite_watt_hour_meter_electric_energy_joules_total Cumulative amounts of electric energy measurement value.
+# HELP echonetlite_watt_hour_meter_electric_energy_joules_total Cumulative amounts of electric energy measurement value. EPC=0xE0
 # TYPE echonetlite_watt_hour_meter_electric_energy_joules_total counter
 echonetlite_watt_hour_meter_electric_energy_joules_total{eoj="028001",host="192.0.2.10"} 3600000
 `

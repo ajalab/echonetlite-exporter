@@ -9,12 +9,12 @@ import (
 )
 
 const (
-	epcWaterHeatingStatus                 = 0xB2
-	epcHeaterStatus                       = 0xB3
-	epcLinkageModeForSolarPowerGeneration = 0xB8
-	epcHotWaterSupplyStatus               = 0xC3
-	epcRemainingWater                     = 0xE1
-	epcTankCapacity                       = 0xE2
+	EPCWaterHeatingStatus                 = 0xB2
+	EPCHeaterStatus                       = 0xB3
+	EPCLinkageModeForSolarPowerGeneration = 0xB8
+	EPCHotWaterSupplyStatus               = 0xC3
+	EPCRemainingWater                     = 0xE1
+	EPCTankCapacity                       = 0xE2
 )
 
 type HybridWaterHeater struct {
@@ -42,17 +42,17 @@ func (c *HybridWaterHeaterClient) Get(ctx context.Context, host string, eoj EOJ)
 	}
 
 	// AIF §3.1.4 allows these device properties to be read together.
-	values, err := read.group(ctx, []uint8{epcLinkageModeForSolarPowerGeneration},
-		supportedEPCs(supported, epcWaterHeatingStatus, epcHotWaterSupplyStatus))
+	values, err := read.group(ctx, []uint8{EPCLinkageModeForSolarPowerGeneration},
+		supportedEPCs(supported, EPCWaterHeatingStatus, EPCHotWaterSupplyStatus))
 	if err != nil {
 		return nil, err
 	}
-	linkageMode, err := decodeByte(values[epcLinkageModeForSolarPowerGeneration], 0x41, 0x44)
+	linkageMode, err := decodeByte(values[EPCLinkageModeForSolarPowerGeneration], 0x41, 0x44)
 	if err != nil {
 		return nil, fmt.Errorf("linkageModeForSolarPowerGeneration (EPC 0xB8): %w", err)
 	}
 	optional, err := read.optionalIndividually(ctx, supportedEPCs(supported,
-		epcHeaterStatus, epcRemainingWater, epcTankCapacity))
+		EPCHeaterStatus, EPCRemainingWater, EPCTankCapacity))
 	if err != nil {
 		return nil, err
 	}
@@ -62,9 +62,9 @@ func (c *HybridWaterHeaterClient) Get(ctx context.Context, host string, eoj EOJ)
 		epc  uint8
 		dest **bool
 	}{
-		{epcWaterHeatingStatus, &reading.WaterHeatingStatus},
-		{epcHeaterStatus, &reading.HeaterStatus},
-		{epcHotWaterSupplyStatus, &reading.HotWaterSupplyStatus},
+		{EPCWaterHeatingStatus, &reading.WaterHeatingStatus},
+		{EPCHeaterStatus, &reading.HeaterStatus},
+		{EPCHotWaterSupplyStatus, &reading.HotWaterSupplyStatus},
 	} {
 		edt := values[field.epc]
 		if len(edt) == 0 {
@@ -80,8 +80,8 @@ func (c *HybridWaterHeaterClient) Get(ctx context.Context, host string, eoj EOJ)
 		epc  uint8
 		dest **uint16
 	}{
-		{epcRemainingWater, &reading.RemainingWater},
-		{epcTankCapacity, &reading.TankCapacity},
+		{EPCRemainingWater, &reading.RemainingWater},
+		{EPCTankCapacity, &reading.TankCapacity},
 	} {
 		edt := values[field.epc]
 		if len(edt) == 0 {
