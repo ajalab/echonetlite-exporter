@@ -21,9 +21,9 @@ type HybridWaterHeater struct {
 	SuperClass
 
 	LinkageModeForSolarPowerGeneration uint8
-	WaterHeatingStatus                 *bool
-	HeaterStatus                       *bool
-	HotWaterSupplyStatus               *bool
+	WaterHeatingStatus                 *uint8
+	HeaterStatus                       *uint8
+	HotWaterSupplyStatus               *uint8
 	RemainingWater                     *uint16 // L
 	TankCapacity                       *uint16 // L
 
@@ -66,7 +66,7 @@ func (c *HybridWaterHeaterClient) Get(ctx context.Context, host string, eoj EOJ)
 	reading := &HybridWaterHeater{LinkageModeForSolarPowerGeneration: linkageMode}
 	for _, field := range []struct {
 		epc  uint8
-		dest **bool
+		dest **uint8
 	}{
 		{EPCWaterHeatingStatus, &reading.WaterHeatingStatus},
 		{EPCHeaterStatus, &reading.HeaterStatus},
@@ -76,7 +76,7 @@ func (c *HybridWaterHeaterClient) Get(ctx context.Context, host string, eoj EOJ)
 		if len(edt) == 0 {
 			continue
 		}
-		value, err := decodeHeatingState(edt)
+		value, err := decodeByte(edt, 0x41, 0x42)
 		if err != nil {
 			return nil, fmt.Errorf("heating state (EPC 0x%02X): %w", field.epc, err)
 		}

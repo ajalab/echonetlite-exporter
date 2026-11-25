@@ -19,7 +19,7 @@ func NewGasMeterCollector(
 	interval time.Duration,
 	targets []echonetlite.Device,
 ) *GasMeterCollector {
-	consumption := newMetricDescriptor(
+	consumption := newPropertyMetricDescriptor(
 		echonetlite.EPCCumulativeGasConsumption,
 		"cumulativeGasConsumption", "cubic_meters", cumulativeReading,
 		"echonetlite_gas_meter_gas_consumption_cubic_meters_total",
@@ -27,7 +27,7 @@ func NewGasMeterCollector(
 		deviceLabels,
 	)
 	const prefix = "echonetlite_gas_meter_"
-	superClass := newSuperClassMetrics(prefix)
+	superClass := newSuperClassMetrics(prefix, superClassOperationStatusValues)
 	descs := append([]metricDescriptor{consumption}, superClass.descriptors()...)
 	return &GasMeterCollector{
 		collector: newCollector(interval, targets, descs, get,

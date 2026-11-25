@@ -29,12 +29,12 @@ func TestInstantaneousWaterHeaterGetUsesAIFPropertyGroup(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	if !got.HotWaterHeatingStatus || got.BathWaterHeatingStatus {
+	if got.HotWaterHeatingStatus != 0x41 || got.BathWaterHeatingStatus != 0x42 {
 		t.Fatalf("unexpected mandatory heating states: %+v", got)
 	}
-	if got.AutomaticBathOperation == nil || *got.AutomaticBathOperation ||
+	if got.AutomaticBathOperation == nil || *got.AutomaticBathOperation != 0x42 ||
 		got.TargetSuppliedWaterTemperature == nil || *got.TargetSuppliedWaterTemperature != 0 ||
-		got.KitchenHotWaterSupplyStatus == nil || !*got.KitchenHotWaterSupplyStatus ||
+		got.KitchenHotWaterSupplyStatus == nil || *got.KitchenHotWaterSupplyStatus != 0x41 ||
 		got.BathOperationStatus == nil || *got.BathOperationStatus != 0x43 {
 		t.Fatalf("expected valid decoded optional values: %+v", got)
 	}
@@ -85,7 +85,7 @@ func TestInstantaneousWaterHeaterGetSkipsOutOfRangeBathVolumes(t *testing.T) {
 			if err != nil {
 				t.Fatal(err)
 			}
-			if !got.HotWaterHeatingStatus || got.BathWaterHeatingStatus ||
+			if got.HotWaterHeatingStatus != 0x41 || got.BathWaterHeatingStatus != 0x42 ||
 				!reflect.DeepEqual(got.BathWaterVolume1, tc.want1) || !reflect.DeepEqual(got.BathWaterVolume3, tc.want3) {
 				t.Fatalf("expected heating states and only the in-range bath volume: %+v", got)
 			}

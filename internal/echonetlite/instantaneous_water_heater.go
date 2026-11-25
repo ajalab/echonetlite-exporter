@@ -22,13 +22,13 @@ const (
 type InstantaneousWaterHeater struct {
 	SuperClass
 
-	HotWaterHeatingStatus          bool
-	BathWaterHeatingStatus         bool
-	AutomaticBathOperation         *bool
+	HotWaterHeatingStatus          uint8
+	BathWaterHeatingStatus         uint8
+	AutomaticBathOperation         *uint8
 	TargetSuppliedWaterTemperature *uint8 // °C
 	TargetBathWaterTemperature     *uint8 // °C
-	ShowerHotWaterSupplyStatus     *bool
-	KitchenHotWaterSupplyStatus    *bool
+	ShowerHotWaterSupplyStatus     *uint8
+	KitchenHotWaterSupplyStatus    *uint8
 	BathOperationStatus            *uint8
 
 	HotWaterWarmerSetting               *uint8
@@ -62,11 +62,11 @@ func (c *InstantaneousWaterHeaterClient) Get(ctx context.Context, host string, e
 	if err != nil {
 		return nil, err
 	}
-	hotWaterHeating, err := decodeHeatingState(values[EPCHotWaterHeatingStatus])
+	hotWaterHeating, err := decodeByte(values[EPCHotWaterHeatingStatus], 0x41, 0x42)
 	if err != nil {
 		return nil, fmt.Errorf("hotWaterHeatingStatus (EPC 0xD0): %w", err)
 	}
-	bathWaterHeating, err := decodeHeatingState(values[EPCBathWaterHeatingStatus])
+	bathWaterHeating, err := decodeByte(values[EPCBathWaterHeatingStatus], 0x41, 0x42)
 	if err != nil {
 		return nil, fmt.Errorf("bathWaterHeatingStatus (EPC 0xE2): %w", err)
 	}
@@ -84,7 +84,7 @@ func (c *InstantaneousWaterHeaterClient) Get(ctx context.Context, host string, e
 	}
 	for _, field := range []struct {
 		epc  uint8
-		dest **bool
+		dest **uint8
 	}{
 		{EPCAutomaticBathOperation, &reading.AutomaticBathOperation},
 		{EPCShowerHotWaterSupplyStatus, &reading.ShowerHotWaterSupplyStatus},
@@ -94,7 +94,7 @@ func (c *InstantaneousWaterHeaterClient) Get(ctx context.Context, host string, e
 		if len(edt) == 0 {
 			continue
 		}
-		value, err := decodeHeatingState(edt)
+		value, err := decodeByte(edt, 0x41, 0x42)
 		if err != nil {
 			return nil, fmt.Errorf("heating state (EPC 0x%02X): %w", field.epc, err)
 		}

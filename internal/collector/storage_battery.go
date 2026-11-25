@@ -19,28 +19,28 @@ func NewStorageBatteryCollector(
 	interval time.Duration,
 	targets []echonetlite.Device,
 ) *StorageBatteryCollector {
-	chargeableEnergy := newMetricDescriptor(
+	chargeableEnergy := newPropertyMetricDescriptor(
 		echonetlite.EPCACChargeableElectricEnergy,
 		"acChargeableElectricEnergy", "joules", gaugeReading,
 		"echonetlite_storage_battery_ac_chargeable_electric_energy_joules",
 		"AC chargeable electric energy",
 		deviceLabels,
 	)
-	dischargeableEnergy := newMetricDescriptor(
+	dischargeableEnergy := newPropertyMetricDescriptor(
 		echonetlite.EPCACDischargeableElectricEnergy,
 		"acDischargeableElectricEnergy", "joules", gaugeReading,
 		"echonetlite_storage_battery_ac_dischargeable_electric_energy_joules",
 		"AC dischargeable electric energy",
 		deviceLabels,
 	)
-	chargingEnergy := newMetricDescriptor(
+	chargingEnergy := newPropertyMetricDescriptor(
 		echonetlite.EPCACCumulativeChargingElectricEnergy,
 		"acCumulativeChargingElectricEnergy", "joules", cumulativeReading,
 		"echonetlite_storage_battery_ac_charging_electric_energy_joules_total",
 		"AC measured cumulative charging electric energy",
 		deviceLabels,
 	)
-	dischargingEnergy := newMetricDescriptor(
+	dischargingEnergy := newPropertyMetricDescriptor(
 		echonetlite.EPCACCumulativeDischargingElectricEnergy,
 		"acCumulativeDischargingElectricEnergy", "joules", cumulativeReading,
 		"echonetlite_storage_battery_ac_discharging_electric_energy_joules_total",
@@ -49,81 +49,88 @@ func NewStorageBatteryCollector(
 	)
 	boundsLabels := []string{"host", "eoj", "bound"}
 	const prefix = "echonetlite_storage_battery_"
-	acEffectiveChargingCapacity := newMetricDescriptor(0xA0, "acEffectiveChargingCapacity", "joules", gaugeReading,
+	acEffectiveChargingCapacity := newPropertyMetricDescriptor(0xA0, "acEffectiveChargingCapacity", "joules", gaugeReading,
 		prefix+"ac_effective_charging_capacity_joules", "AC effective capacity (charging)", deviceLabels)
-	acEffectiveDischargingCapacity := newMetricDescriptor(0xA1, "acEffectiveDischargingCapacity", "joules", gaugeReading,
+	acEffectiveDischargingCapacity := newPropertyMetricDescriptor(0xA1, "acEffectiveDischargingCapacity", "joules", gaugeReading,
 		prefix+"ac_effective_discharging_capacity_joules", "AC effective capacity (discharging)", deviceLabels)
-	acChargeableCapacity := newMetricDescriptor(0xA2, "acChargeableCapacity", "joules", gaugeReading,
+	acChargeableCapacity := newPropertyMetricDescriptor(0xA2, "acChargeableCapacity", "joules", gaugeReading,
 		prefix+"ac_chargeable_capacity_joules", "AC chargeable capacity", deviceLabels)
-	acDischargeableCapacity := newMetricDescriptor(0xA3, "acDischargeableCapacity", "joules", gaugeReading,
+	acDischargeableCapacity := newPropertyMetricDescriptor(0xA3, "acDischargeableCapacity", "joules", gaugeReading,
 		prefix+"ac_dischargeable_capacity_joules", "AC dischargeable capacity", deviceLabels)
-	acChargeUpperLimit := newMetricDescriptor(0xA6, "acChargeUpperLimit", "ratio", gaugeReading,
+	acChargeUpperLimit := newPropertyMetricDescriptor(0xA6, "acChargeUpperLimit", "ratio", gaugeReading,
 		prefix+"ac_charge_upper_limit_ratio", "AC charge upper limit setting", deviceLabels)
-	acDischargeLowerLimit := newMetricDescriptor(0xA7, "acDischargeLowerLimit", "ratio", gaugeReading,
+	acDischargeLowerLimit := newPropertyMetricDescriptor(0xA7, "acDischargeLowerLimit", "ratio", gaugeReading,
 		prefix+"ac_discharge_lower_limit_ratio", "AC discharge lower limit setting", deviceLabels)
-	acTargetChargingElectricEnergy := newMetricDescriptor(0xAA, "acTargetChargingElectricEnergy", "joules", gaugeReading,
+	acTargetChargingElectricEnergy := newPropertyMetricDescriptor(0xAA, "acTargetChargingElectricEnergy", "joules", gaugeReading,
 		prefix+"ac_target_charging_electric_energy_joules", "AC charge amount setting value", deviceLabels)
-	acTargetDischargingElectricEnergy := newMetricDescriptor(0xAB, "acTargetDischargingElectricEnergy", "joules", gaugeReading,
+	acTargetDischargingElectricEnergy := newPropertyMetricDescriptor(0xAB, "acTargetDischargingElectricEnergy", "joules", gaugeReading,
 		prefix+"ac_target_discharging_electric_energy_joules", "AC discharge amount setting value", deviceLabels)
-	chargingMethod := newMetricDescriptor(0xC1, "chargingMethod", "", gaugeReading,
-		prefix+"charging_method", "Charging method", deviceLabels)
-	dischargingMethod := newMetricDescriptor(0xC2, "dischargingMethod", "", gaugeReading,
-		prefix+"discharging_method", "Discharging method", deviceLabels)
-	acRatedElectricEnergy := newMetricDescriptor(0xC7, "acRatedElectricEnergy", "joules", gaugeReading,
+	chargingMethod := newPropertyMetricDescriptorWithValues(0xC1, "chargingMethod",
+		prefix+"charging_method", "Charging method",
+		`{"0":"Others","1":"Maximum charging electric energy charting","2":"Surplus electric energy charging",`+
+			`"3":"Designated electric energy charging","4":"Designated current power charging"}`)
+	dischargingMethod := newPropertyMetricDescriptorWithValues(0xC2, "dischargingMethod",
+		prefix+"discharging_method", "Discharging method",
+		`{"0":"Others","1":"Maximum discharge electric energy discharging","2":"Load following discharge",`+
+			`"3":"Designated electric energy discharging","4":"Designated current power discharging"}`)
+	acRatedElectricEnergy := newPropertyMetricDescriptor(0xC7, "acRatedElectricEnergy", "joules", gaugeReading,
 		prefix+"ac_rated_electric_energy_joules", "AC rated electric energy", deviceLabels)
-	minimumAndMaximumChargingElectricPower := newMetricDescriptor(0xC8, "minimumAndMaximumChargingElectricPower", "watts", gaugeReading,
+	minimumAndMaximumChargingElectricPower := newPropertyMetricDescriptor(0xC8, "minimumAndMaximumChargingElectricPower", "watts", gaugeReading,
 		prefix+"minimum_and_maximum_charging_electric_power_watts", "Minimum/maximum charging electric power", boundsLabels)
-	minimumAndMaximumDischargingElectricPower := newMetricDescriptor(0xC9, "minimumAndMaximumDischargingElectricPower", "watts", gaugeReading,
+	minimumAndMaximumDischargingElectricPower := newPropertyMetricDescriptor(0xC9, "minimumAndMaximumDischargingElectricPower", "watts", gaugeReading,
 		prefix+"minimum_and_maximum_discharging_electric_power_watts", "Minimum/maximum discharging electric power", boundsLabels)
-	minimumAndMaximumChargingCurrent := newMetricDescriptor(0xCA, "minimumAndMaximumChargingCurrent", "amperes", gaugeReading,
+	minimumAndMaximumChargingCurrent := newPropertyMetricDescriptor(0xCA, "minimumAndMaximumChargingCurrent", "amperes", gaugeReading,
 		prefix+"minimum_and_maximum_charging_current_amperes", "Minimum/maximum charging current", boundsLabels)
-	minimumAndMaximumDischargingCurrent := newMetricDescriptor(0xCB, "minimumAndMaximumDischargingCurrent", "amperes", gaugeReading,
+	minimumAndMaximumDischargingCurrent := newPropertyMetricDescriptor(0xCB, "minimumAndMaximumDischargingCurrent", "amperes", gaugeReading,
 		prefix+"minimum_and_maximum_discharging_current_amperes", "Minimum/maximum discharging current", boundsLabels)
-	reInterconnectionPermission := newMetricDescriptor(0xCC, "reInterconnectionPermission", "", gaugeReading,
-		prefix+"re_interconnection_permission", "Re-interconnection permission setting", deviceLabels)
-	operationPermission := newMetricDescriptor(0xCD, "operationPermission", "", gaugeReading,
-		prefix+"operation_permission", "Operation permission setting", deviceLabels)
-	independentOperationPermission := newMetricDescriptor(0xCE, "independentOperationPermission", "", gaugeReading,
-		prefix+"independent_operation_permission", "Independent operation permission setting", deviceLabels)
-	actualOperationMode := newMetricDescriptor(0xCF, "actualOperationMode", "", gaugeReading,
-		prefix+"actual_operation_mode", "Working operation status", deviceLabels)
-	ratedElectricEnergy := newMetricDescriptor(0xD0, "ratedElectricEnergy", "joules", gaugeReading,
+	const permissionValues = `{"65":"Permitted","66":"Prohibited"}`
+	reInterconnectionPermission := newPropertyMetricDescriptorWithValues(0xCC, "reInterconnectionPermission",
+		prefix+"re_interconnection_permission", "Re-interconnection permission setting", permissionValues)
+	operationPermission := newPropertyMetricDescriptorWithValues(0xCD, "operationPermission",
+		prefix+"operation_permission", "Operation permission setting", permissionValues)
+	independentOperationPermission := newPropertyMetricDescriptorWithValues(0xCE, "independentOperationPermission",
+		prefix+"independent_operation_permission", "Independent operation permission setting", permissionValues)
+	const operationModeValues = `{"64":"Other","65":"Rapid charging","66":"Charging","67":"Discharging",` +
+		`"68":"Standby","69":"Test","70":"Automatic","72":"Restart","73":"Effective capacity recalculation processing"}`
+	actualOperationMode := newPropertyMetricDescriptorWithValues(0xCF, "actualOperationMode",
+		prefix+"actual_operation_mode", "Working operation status", operationModeValues)
+	ratedElectricEnergy := newPropertyMetricDescriptor(0xD0, "ratedElectricEnergy", "joules", gaugeReading,
 		prefix+"rated_electric_energy_joules", "Rated electric energy", deviceLabels)
-	ratedCapacity := newMetricDescriptor(0xD1, "ratedCapacity", "coulombs", gaugeReading,
+	ratedCapacity := newPropertyMetricDescriptor(0xD1, "ratedCapacity", "coulombs", gaugeReading,
 		prefix+"rated_capacity_coulombs", "Rated capacity", deviceLabels)
-	ratedVoltage := newMetricDescriptor(0xD2, "ratedVoltage", "volts", gaugeReading,
+	ratedVoltage := newPropertyMetricDescriptor(0xD2, "ratedVoltage", "volts", gaugeReading,
 		prefix+"rated_voltage_volts", "Rated voltage", deviceLabels)
-	instantaneousChargingAndDischargingElectricPower := newMetricDescriptor(0xD3, "instantaneousChargingAndDischargingElectricPower", "watts", instantaneousReading,
+	instantaneousChargingAndDischargingElectricPower := newPropertyMetricDescriptor(0xD3, "instantaneousChargingAndDischargingElectricPower", "watts", instantaneousReading,
 		prefix+"charging_and_discharging_electric_power_watts", "Measured instantaneous charging/discharging electric energy", deviceLabels)
-	instantaneousChargingAndDischargingCurrent := newMetricDescriptor(0xD4, "instantaneousChargingAndDischargingCurrent", "amperes", instantaneousReading,
+	instantaneousChargingAndDischargingCurrent := newPropertyMetricDescriptor(0xD4, "instantaneousChargingAndDischargingCurrent", "amperes", instantaneousReading,
 		prefix+"charging_and_discharging_current_amperes", "Measured instantaneous charging/discharging current", deviceLabels)
-	instantaneousChargingAndDischargingVoltage := newMetricDescriptor(0xD5, "instantaneousChargingAndDischargingVoltage", "volts", instantaneousReading,
+	instantaneousChargingAndDischargingVoltage := newPropertyMetricDescriptor(0xD5, "instantaneousChargingAndDischargingVoltage", "volts", instantaneousReading,
 		prefix+"charging_and_discharging_voltage_volts", "Measured instantaneous charging/discharging voltage", deviceLabels)
-	cumulativeDischargingElectricEnergy := newMetricDescriptor(0xD6, "cumulativeDischargingElectricEnergy", "joules", cumulativeReading,
+	cumulativeDischargingElectricEnergy := newPropertyMetricDescriptor(0xD6, "cumulativeDischargingElectricEnergy", "joules", cumulativeReading,
 		prefix+"discharging_electric_energy_joules_total", "Measured cumulative discharging electric energy", deviceLabels)
-	cumulativeChargingElectricEnergy := newMetricDescriptor(0xD8, "cumulativeChargingElectricEnergy", "joules", cumulativeReading,
+	cumulativeChargingElectricEnergy := newPropertyMetricDescriptor(0xD8, "cumulativeChargingElectricEnergy", "joules", cumulativeReading,
 		prefix+"charging_electric_energy_joules_total", "Measured cumulative charging electric energy", deviceLabels)
-	operationMode := newMetricDescriptor(0xDA, "operationMode", "", gaugeReading,
-		prefix+"operation_mode", "Operation mode setting", deviceLabels)
-	powerSystemInterconnectionStatus := newMetricDescriptor(0xDB, "powerSystemInterconnectionStatus", "", gaugeReading,
-		prefix+"power_system_interconnection_status", "System-interconnected type", deviceLabels)
-	minimumAndMaximumChargingPowerAtIndependent := newMetricDescriptor(0xDC, "minimumAndMaximumChargingPowerAtIndependent", "watts", gaugeReading,
+	operationMode := newPropertyMetricDescriptorWithValues(0xDA, "operationMode",
+		prefix+"operation_mode", "Operation mode setting", operationModeValues)
+	powerSystemInterconnectionStatus := newPropertyMetricDescriptorWithValues(0xDB, "powerSystemInterconnectionStatus",
+		prefix+"power_system_interconnection_status", "System-interconnected type", `{"0":"System interconnection (reverse power flow acceptable)","1":"Independent type","2":"System-interconnected type (reverse power flow not acceptable)"}`)
+	minimumAndMaximumChargingPowerAtIndependent := newPropertyMetricDescriptor(0xDC, "minimumAndMaximumChargingPowerAtIndependent", "watts", gaugeReading,
 		prefix+"minimum_and_maximum_charging_power_at_independent_watts", "Minimum/maximum charging power (Independent)", boundsLabels)
-	minimumAndMaximumDischargingPowerAtIndependent := newMetricDescriptor(0xDD, "minimumAndMaximumDischargingPowerAtIndependent", "watts", gaugeReading,
+	minimumAndMaximumDischargingPowerAtIndependent := newPropertyMetricDescriptor(0xDD, "minimumAndMaximumDischargingPowerAtIndependent", "watts", gaugeReading,
 		prefix+"minimum_and_maximum_discharging_power_at_independent_watts", "Minimum/maximum discharging power (Independent)", boundsLabels)
-	minimumAndMaximumChargingCurrentAtIndependent := newMetricDescriptor(0xDE, "minimumAndMaximumChargingCurrentAtIndependent", "amperes", gaugeReading,
+	minimumAndMaximumChargingCurrentAtIndependent := newPropertyMetricDescriptor(0xDE, "minimumAndMaximumChargingCurrentAtIndependent", "amperes", gaugeReading,
 		prefix+"minimum_and_maximum_charging_current_at_independent_amperes", "Minimum/maximum charging current (Independent)", boundsLabels)
-	minimumAndMaximumDischargingCurrentAtIndependent := newMetricDescriptor(0xDF, "minimumAndMaximumDischargingCurrentAtIndependent", "amperes", gaugeReading,
+	minimumAndMaximumDischargingCurrentAtIndependent := newPropertyMetricDescriptor(0xDF, "minimumAndMaximumDischargingCurrentAtIndependent", "amperes", gaugeReading,
 		prefix+"minimum_and_maximum_discharging_current_at_independent_amperes", "Minimum/maximum discharging current (Independent)", boundsLabels)
-	remainingCapacity1 := newMetricDescriptor(0xE2, "remainingCapacity1", "joules", gaugeReading,
+	remainingCapacity1 := newPropertyMetricDescriptor(0xE2, "remainingCapacity1", "joules", gaugeReading,
 		prefix+"remaining_capacity1_joules", "Remaining stored electricity 1", deviceLabels)
-	remainingCapacity2 := newMetricDescriptor(0xE3, "remainingCapacity2", "coulombs", gaugeReading,
+	remainingCapacity2 := newPropertyMetricDescriptor(0xE3, "remainingCapacity2", "coulombs", gaugeReading,
 		prefix+"remaining_capacity2_coulombs", "Remaining stored electricity 2", deviceLabels)
-	remainingCapacity3 := newMetricDescriptor(0xE4, "remainingCapacity3", "ratio", gaugeReading,
+	remainingCapacity3 := newPropertyMetricDescriptor(0xE4, "remainingCapacity3", "ratio", gaugeReading,
 		prefix+"remaining_capacity3_ratio", "Remaining stored electricity 3", deviceLabels)
-	batteryHealthState := newMetricDescriptor(0xE5, "batteryHealthState", "ratio", gaugeReading,
+	batteryHealthState := newPropertyMetricDescriptor(0xE5, "batteryHealthState", "ratio", gaugeReading,
 		prefix+"battery_health_state_ratio", "Battery state of health", deviceLabels)
-	superClass := newSuperClassMetrics(prefix)
+	superClass := newSuperClassMetrics(prefix, superClassOperationStatusValues)
 	descs := []metricDescriptor{
 		chargeableEnergy, dischargeableEnergy, chargingEnergy, dischargingEnergy,
 		acEffectiveChargingCapacity,

@@ -19,7 +19,7 @@ func NewWaterFlowMeterCollector(
 	interval time.Duration,
 	targets []echonetlite.Device,
 ) *WaterFlowMeterCollector {
-	flow := newMetricDescriptor(
+	flow := newPropertyMetricDescriptor(
 		echonetlite.EPCCumulativeFlowingWater,
 		"cumulativeFlowingWater", "cubic_meters", cumulativeReading,
 		"echonetlite_water_flow_meter_flowing_water_cubic_meters_total",
@@ -27,11 +27,11 @@ func NewWaterFlowMeterCollector(
 		deviceLabels,
 	)
 	const prefix = "echonetlite_water_flow_meter_"
-	abnormalDetection := newMetricDescriptor(0xE3, "abnormalDetection", "", gaugeReading,
-		prefix+"abnormal_detection", "Detection of abnormal value in metering data", deviceLabels)
-	securityDataInformation := newMetricDescriptor(0xE4, "securityDataInformation", "", gaugeReading,
+	abnormalDetection := newPropertyMetricDescriptorWithValues(0xE3, "abnormalDetection",
+		prefix+"abnormal_detection", "Detection of abnormal value in metering data", `{"65":"Detected","66":"Not detected"}`)
+	securityDataInformation := newPropertyMetricDescriptor(0xE4, "securityDataInformation", "", gaugeReading,
 		prefix+"security_data_information", "Security data information", deviceLabels)
-	superClass := newSuperClassMetrics(prefix)
+	superClass := newSuperClassMetrics(prefix, superClassOperationStatusValues)
 	descs := []metricDescriptor{
 		flow,
 		abnormalDetection,

@@ -19,14 +19,14 @@ func NewPVPowerGenerationCollector(
 	interval time.Duration,
 	targets []echonetlite.Device,
 ) *PVPowerGenerationCollector {
-	power := newMetricDescriptor(
+	power := newPropertyMetricDescriptor(
 		echonetlite.EPCInstantaneousElectricPowerGeneration,
 		"instantaneousElectricPowerGeneration", "watts", instantaneousReading,
 		"echonetlite_pv_power_generation_electric_power_generation_watts",
 		"Measured instantaneous amount of electricity generated",
 		deviceLabels,
 	)
-	energy := newMetricDescriptor(
+	energy := newPropertyMetricDescriptor(
 		echonetlite.EPCCumulativeElectricEnergyOfGeneration,
 		"cumulativeElectricEnergyOfGeneration", "joules", cumulativeReading,
 		"echonetlite_pv_power_generation_electric_energy_of_generation_joules_total",
@@ -34,31 +34,31 @@ func NewPVPowerGenerationCollector(
 		deviceLabels,
 	)
 	const prefix = "echonetlite_pv_power_generation_"
-	outputPowerControl1 := newMetricDescriptor(0xA0, "outputPowerControl1", "ratio", gaugeReading,
+	outputPowerControl1 := newPropertyMetricDescriptor(0xA0, "outputPowerControl1", "ratio", gaugeReading,
 		prefix+"output_power_control1_ratio", "Output power control setting 1", deviceLabels)
-	outputPowerControl2 := newMetricDescriptor(0xA1, "outputPowerControl2", "watts", gaugeReading,
+	outputPowerControl2 := newPropertyMetricDescriptor(0xA1, "outputPowerControl2", "watts", gaugeReading,
 		prefix+"output_power_control2_watts", "Output power control setting 2", deviceLabels)
-	upperLimitClip := newMetricDescriptor(0xB4, "upperLimitClip", "watts", gaugeReading,
+	upperLimitClip := newPropertyMetricDescriptor(0xB4, "upperLimitClip", "watts", gaugeReading,
 		prefix+"upper_limit_clip_watts", "Upper limit clip setting value", deviceLabels)
-	approvedCapacity := newMetricDescriptor(0xC3, "approvedCapacity", "watts", gaugeReading,
+	approvedCapacity := newPropertyMetricDescriptor(0xC3, "approvedCapacity", "watts", gaugeReading,
 		prefix+"approved_capacity_watts", "Capacity approved by equipment", deviceLabels)
-	powerSystemInterconnectionStatus := newMetricDescriptor(0xD0, "powerSystemInterconnectionStatus", "", gaugeReading,
-		prefix+"power_system_interconnection_status", "System-interconnected type", deviceLabels)
-	outputPowerRestraintStatus := newMetricDescriptor(0xD1, "outputPowerRestraintStatus", "", gaugeReading,
-		prefix+"output_power_restraint_status", "Output power restraint status", deviceLabels)
-	cumulativeElectricEnergySold := newMetricDescriptor(0xE3, "cumulativeElectricEnergySold", "joules", cumulativeReading,
+	powerSystemInterconnectionStatus := newPropertyMetricDescriptorWithValues(0xD0, "powerSystemInterconnectionStatus",
+		prefix+"power_system_interconnection_status", "System-interconnected type", `{"0":"System-interconnected type (reverse power flow acceptable)","1":"Independent type","2":"System-interconnected type (reverse power flow not acceptable)","3":"Unknown"}`)
+	outputPowerRestraintStatus := newPropertyMetricDescriptorWithValues(0xD1, "outputPowerRestraintStatus",
+		prefix+"output_power_restraint_status", "Output power restraint status", `{"65":"Ongoing restraint (output power control)","66":"Ongoing restraint (except output power control)","67":"Ongoing restraint (reason for restraint is unknown)","68":"Not restraining","69":"Unknown"}`)
+	cumulativeElectricEnergySold := newPropertyMetricDescriptor(0xE3, "cumulativeElectricEnergySold", "joules", cumulativeReading,
 		prefix+"electric_energy_sold_joules_total", "Measured cumulative amount of electric energy sold", deviceLabels)
-	powerGenerationOutputLimit1 := newMetricDescriptor(0xE5, "powerGenerationOutputLimit1", "ratio", gaugeReading,
+	powerGenerationOutputLimit1 := newPropertyMetricDescriptor(0xE5, "powerGenerationOutputLimit1", "ratio", gaugeReading,
 		prefix+"power_generation_output_limit1_ratio", "Power generation output limit setting 1", deviceLabels)
-	powerGenerationOutputLimit2 := newMetricDescriptor(0xE6, "powerGenerationOutputLimit2", "watts", gaugeReading,
+	powerGenerationOutputLimit2 := newPropertyMetricDescriptor(0xE6, "powerGenerationOutputLimit2", "watts", gaugeReading,
 		prefix+"power_generation_output_limit2_watts", "Power generation output limit setting 2", deviceLabels)
-	limitElectricEnergySold := newMetricDescriptor(0xE7, "limitElectricEnergySold", "watts", gaugeReading,
+	limitElectricEnergySold := newPropertyMetricDescriptor(0xE7, "limitElectricEnergySold", "watts", gaugeReading,
 		prefix+"limit_electric_energy_sold_watts", "Limit setting for the amount of electricity sold", deviceLabels)
-	ratedElectricPowerOfgeneration := newMetricDescriptor(0xE8, "ratedElectricPowerOfgeneration", "watts", gaugeReading,
+	ratedElectricPowerOfgeneration := newPropertyMetricDescriptor(0xE8, "ratedElectricPowerOfgeneration", "watts", gaugeReading,
 		prefix+"rated_electric_power_ofgeneration_watts", "Rated power generation output (System-interconnected)", deviceLabels)
-	ratedElectricPowerOfgenerationIndependent := newMetricDescriptor(0xE9, "ratedElectricPowerOfgenerationIndependent", "watts", gaugeReading,
+	ratedElectricPowerOfgenerationIndependent := newPropertyMetricDescriptor(0xE9, "ratedElectricPowerOfgenerationIndependent", "watts", gaugeReading,
 		prefix+"rated_electric_power_ofgeneration_independent_watts", "Rated power generation output (Independent)", deviceLabels)
-	superClass := newSuperClassMetrics(prefix)
+	superClass := newSuperClassMetrics(prefix, superClassOperationStatusValues)
 	descs := []metricDescriptor{
 		power, energy,
 		outputPowerControl1,

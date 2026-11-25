@@ -30,7 +30,7 @@ echonetlite_storage_battery_ac_dischargeable_electric_energy_joules{eoj="027D01"
 # HELP echonetlite_storage_battery_ac_discharging_electric_energy_joules_total AC measured cumulative discharging electric energy. EPC=0xA9
 # TYPE echonetlite_storage_battery_ac_discharging_electric_energy_joules_total counter
 echonetlite_storage_battery_ac_discharging_electric_energy_joules_total{eoj="027D01",host="192.0.2.10"} 2700000
-# HELP echonetlite_storage_battery_actual_operation_mode Working operation status. EPC=0xCF
+# HELP echonetlite_storage_battery_actual_operation_mode Working operation status. values={"64":"Other","65":"Rapid charging","66":"Charging","67":"Discharging","68":"Standby","69":"Test","70":"Automatic","72":"Restart","73":"Effective capacity recalculation processing"} EPC=0xCF
 # TYPE echonetlite_storage_battery_actual_operation_mode gauge
 echonetlite_storage_battery_actual_operation_mode{eoj="027D01",host="192.0.2.10"} 67
 # HELP echonetlite_storage_battery_minimum_and_maximum_charging_current_amperes Minimum/maximum charging current. EPC=0xCA
@@ -45,10 +45,10 @@ echonetlite_storage_battery_remaining_capacity2_coulombs{eoj="027D01",host="192.
 # HELP echonetlite_storage_battery_remaining_capacity3_ratio Remaining stored electricity 3. EPC=0xE4
 # TYPE echonetlite_storage_battery_remaining_capacity3_ratio gauge
 echonetlite_storage_battery_remaining_capacity3_ratio{eoj="027D01",host="192.0.2.10"} 0.75
-# HELP echonetlite_storage_battery_fault_status Fault status. EPC=0x88
+# HELP echonetlite_storage_battery_fault_status Fault status. values={"65":"Fault occurred.","66":"No fault has occurred."} EPC=0x88
 # TYPE echonetlite_storage_battery_fault_status gauge
 echonetlite_storage_battery_fault_status{eoj="027D01",host="192.0.2.10"} 66
-# HELP echonetlite_storage_battery_operation_status Operation status. EPC=0x80
+# HELP echonetlite_storage_battery_operation_status Operation status. values={"48":"ON","49":"OFF"} EPC=0x80
 # TYPE echonetlite_storage_battery_operation_status gauge
 echonetlite_storage_battery_operation_status{eoj="027D01",host="192.0.2.10"} 48
 `

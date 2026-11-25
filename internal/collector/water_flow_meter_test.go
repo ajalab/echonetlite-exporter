@@ -18,13 +18,13 @@ func TestWaterFlowMeterCollectorPublishesMetrics(t *testing.T) {
 # HELP echonetlite_water_flow_meter_flowing_water_cubic_meters_total Measured cumulative amount of flowing water. EPC=0xE0
 # TYPE echonetlite_water_flow_meter_flowing_water_cubic_meters_total counter
 echonetlite_water_flow_meter_flowing_water_cubic_meters_total{eoj="028101",host="192.0.2.10"} 0.1
-# HELP echonetlite_water_flow_meter_abnormal_detection Detection of abnormal value in metering data. EPC=0xE3
+# HELP echonetlite_water_flow_meter_abnormal_detection Detection of abnormal value in metering data. values={"65":"Detected","66":"Not detected"} EPC=0xE3
 # TYPE echonetlite_water_flow_meter_abnormal_detection gauge
 echonetlite_water_flow_meter_abnormal_detection{eoj="028101",host="192.0.2.10"} 65
-# HELP echonetlite_water_flow_meter_fault_status Fault status. EPC=0x88
+# HELP echonetlite_water_flow_meter_fault_status Fault status. values={"65":"Fault occurred.","66":"No fault has occurred."} EPC=0x88
 # TYPE echonetlite_water_flow_meter_fault_status gauge
 echonetlite_water_flow_meter_fault_status{eoj="028101",host="192.0.2.10"} 66
-# HELP echonetlite_water_flow_meter_operation_status Operation status. EPC=0x80
+# HELP echonetlite_water_flow_meter_operation_status Operation status. values={"48":"ON","49":"OFF"} EPC=0x80
 # TYPE echonetlite_water_flow_meter_operation_status gauge
 echonetlite_water_flow_meter_operation_status{eoj="028101",host="192.0.2.10"} 48
 # HELP echonetlite_water_flow_meter_security_data_information Security data information. EPC=0xE4

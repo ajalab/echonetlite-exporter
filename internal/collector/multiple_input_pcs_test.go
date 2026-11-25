@@ -22,10 +22,10 @@ echonetlite_multiple_input_pcs_normal_direction_electric_energy_joules_total{eoj
 # HELP echonetlite_multiple_input_pcs_reverse_direction_electric_energy_joules_total Measured cumulative amount of electric energy (reverse direction). EPC=0xE3
 # TYPE echonetlite_multiple_input_pcs_reverse_direction_electric_energy_joules_total counter
 echonetlite_multiple_input_pcs_reverse_direction_electric_energy_joules_total{eoj="02A501",host="192.0.2.10"} 72000
-# HELP echonetlite_multiple_input_pcs_fault_status Fault status. EPC=0x88
+# HELP echonetlite_multiple_input_pcs_fault_status Fault status. values={"65":"Fault occurred.","66":"No fault has occurred."} EPC=0x88
 # TYPE echonetlite_multiple_input_pcs_fault_status gauge
 echonetlite_multiple_input_pcs_fault_status{eoj="02A501",host="192.0.2.10"} 66
-# HELP echonetlite_multiple_input_pcs_operation_status Operation status. EPC=0x80
+# HELP echonetlite_multiple_input_pcs_operation_status Operation status. values={"48":"On","49":"Off"} EPC=0x80
 # TYPE echonetlite_multiple_input_pcs_operation_status gauge
 echonetlite_multiple_input_pcs_operation_status{eoj="02A501",host="192.0.2.10"} 48
 `

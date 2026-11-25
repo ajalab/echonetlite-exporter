@@ -1,12 +1,14 @@
 package collector
 
 import (
+	"cmp"
 	"encoding/json"
 	"fmt"
 	"os"
 	"path/filepath"
 	"regexp"
 	"slices"
+	"strconv"
 	"strings"
 	"testing"
 
@@ -19,6 +21,13 @@ type mraProperty struct {
 	PropertyName struct {
 		English string `json:"en"`
 	} `json:"propertyName"`
+	Data mraData `json:"data"`
+}
+
+type mraData struct {
+	Ref  string          `json:"$ref"`
+	Type string          `json:"type"`
+	Enum json.RawMessage `json:"enum"`
 }
 
 func assertMRAMetricConventions(t *testing.T, registry *prometheus.Registry, class uint16, descriptors []metricDescriptor) {
@@ -69,6 +78,16 @@ func assertMRAMetricConventions(t *testing.T, registry *prometheus.Registry, cla
 	if err := json.Unmarshal(superData, &superclass); err != nil {
 		t.Fatalf("decode MRA superclass: %v", err)
 	}
+	definitionData, err := os.ReadFile(filepath.Join(dir, "definitions", "definitions.json"))
+	if err != nil {
+		t.Fatalf("read MRA definitions: %v", err)
+	}
+	var shared struct {
+		Definitions map[string]mraData `json:"definitions"`
+	}
+	if err := json.Unmarshal(definitionData, &shared); err != nil {
+		t.Fatalf("decode MRA definitions: %v", err)
+	}
 	mraProperties := make(map[string]mraProperty)
 	for _, property := range slices.Concat(superclass.Properties, device.Properties) {
 		mraProperties[property.ShortName] = property
@@ -107,7 +126,19 @@ func assertMRAMetricConventions(t *testing.T, registry *prometheus.Registry, cla
 			nameParts = append(nameParts, "total")
 		}
 		wantName := strings.Join(nameParts, "_")
-		wantHelp := mra.PropertyName.English + ". EPC=" + mra.EPC
+		wantHelp := mra.PropertyName.English + "."
+		propertyData := mra.Data
+		if propertyData.Ref != "" {
+			var found bool
+			propertyData, found = shared.Definitions[strings.TrimPrefix(propertyData.Ref, "#/definitions/")]
+			if !found {
+				t.Fatalf("%s/%s: MRA definition %q not found", classCode, mra.EPC, mra.Data.Ref)
+			}
+		}
+		if propertyData.Type == "state" {
+			wantHelp += " values=" + mraStateValues(t, propertyData)
+		}
+		wantHelp += " EPC=" + mra.EPC
 		// Check descriptor metadata even when the fixture has no sample for it.
 		wantDesc := fmt.Sprintf("Desc{fqName: %q, help: %q,", wantName, wantHelp)
 		if !strings.HasPrefix(descriptor.desc.String(), wantDesc) {
@@ -135,6 +166,49 @@ func assertMRAMetricConventions(t *testing.T, registry *prometheus.Registry, cla
 			t.Errorf("%s: unexpected metric family %q; each device metric family must match an expected MRA EPC", classCode, name)
 		}
 	}
+}
+
+func mraStateValues(t *testing.T, data mraData) string {
+	t.Helper()
+	var entries []struct {
+		EDT          string `json:"edt"`
+		Descriptions struct {
+			English string `json:"en"`
+		} `json:"descriptions"`
+	}
+	if err := json.Unmarshal(data.Enum, &entries); err != nil {
+		t.Fatalf("decode MRA state enum: %v", err)
+	}
+	type state struct {
+		firstCode uint64
+		jsonPair  string
+	}
+	states := make([]state, 0, len(entries))
+	for _, entry := range entries {
+		parts := strings.Split(entry.EDT, "...")
+		var firstCode uint64
+		for i, part := range parts {
+			code, err := strconv.ParseUint(part, 0, 64)
+			if err != nil {
+				t.Fatalf("decode MRA state code %q: %v", part, err)
+			}
+			if i == 0 {
+				firstCode = code
+			}
+			parts[i] = strconv.FormatUint(code, 10)
+		}
+		description, err := json.Marshal(entry.Descriptions.English)
+		if err != nil {
+			t.Fatalf("encode MRA state description: %v", err)
+		}
+		states = append(states, state{firstCode, fmt.Sprintf("%q:%s", strings.Join(parts, "..."), description)})
+	}
+	slices.SortFunc(states, func(a, b state) int { return cmp.Compare(a.firstCode, b.firstCode) })
+	pairs := make([]string, 0, len(states))
+	for _, state := range states {
+		pairs = append(pairs, state.jsonPair)
+	}
+	return "{" + strings.Join(pairs, ",") + "}"
 }
 
 var (

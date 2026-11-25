@@ -15,10 +15,10 @@ func TestGasMeterCollectorPublishesMetrics(t *testing.T) {
 # HELP echonetlite_gas_meter_gas_consumption_cubic_meters_total Cumulative amount of gas consumption measurement value. EPC=0xE0
 # TYPE echonetlite_gas_meter_gas_consumption_cubic_meters_total counter
 echonetlite_gas_meter_gas_consumption_cubic_meters_total{eoj="028201",host="192.0.2.10"} 1.234
-# HELP echonetlite_gas_meter_fault_status Fault status. EPC=0x88
+# HELP echonetlite_gas_meter_fault_status Fault status. values={"65":"Fault occurred.","66":"No fault has occurred."} EPC=0x88
 # TYPE echonetlite_gas_meter_fault_status gauge
 echonetlite_gas_meter_fault_status{eoj="028201",host="192.0.2.10"} 66
-# HELP echonetlite_gas_meter_operation_status Operation status. EPC=0x80
+# HELP echonetlite_gas_meter_operation_status Operation status. values={"48":"ON","49":"OFF"} EPC=0x80
 # TYPE echonetlite_gas_meter_operation_status gauge
 echonetlite_gas_meter_operation_status{eoj="028201",host="192.0.2.10"} 48
 `

@@ -30,10 +30,10 @@ echonetlite_dr_electric_energy_meter_independent_operation_electric_energy_joule
 # HELP echonetlite_dr_electric_energy_meter_independent_operation_electric_power_watts Measured instantaneous electric power (output during a power outage). EPC=0xEA
 # TYPE echonetlite_dr_electric_energy_meter_independent_operation_electric_power_watts gauge
 echonetlite_dr_electric_energy_meter_independent_operation_electric_power_watts{eoj="028E01",host="192.0.2.10"} 55
-# HELP echonetlite_dr_electric_energy_meter_fault_status Fault status. EPC=0x88
+# HELP echonetlite_dr_electric_energy_meter_fault_status Fault status. values={"65":"Fault occurred.","66":"No fault has occurred."} EPC=0x88
 # TYPE echonetlite_dr_electric_energy_meter_fault_status gauge
 echonetlite_dr_electric_energy_meter_fault_status{eoj="028E01",host="192.0.2.10"} 66
-# HELP echonetlite_dr_electric_energy_meter_operation_status Operation status. EPC=0x80
+# HELP echonetlite_dr_electric_energy_meter_operation_status Operation status. values={"48":"ON","49":"OFF"} EPC=0x80
 # TYPE echonetlite_dr_electric_energy_meter_operation_status gauge
 echonetlite_dr_electric_energy_meter_operation_status{eoj="028E01",host="192.0.2.10"} 48
 `
