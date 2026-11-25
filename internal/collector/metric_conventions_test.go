@@ -59,22 +59,28 @@ func assertMRAMetricConventions(t *testing.T, registry *prometheus.Registry, cla
 			unmatched[name] = index
 		}
 	}
-	mraProperties := make(map[string][]mraProperty, len(device.Properties))
-	for _, property := range device.Properties {
-		if property.ShortName != "" {
-			mraProperties[property.ShortName] = append(mraProperties[property.ShortName], property)
-		}
+	superData, err := os.ReadFile(filepath.Join(dir, "superClass", "0x0000.json"))
+	if err != nil {
+		t.Fatalf("read MRA superclass: %v", err)
+	}
+	var superclass struct {
+		Properties []mraProperty `json:"elProperties"`
+	}
+	if err := json.Unmarshal(superData, &superclass); err != nil {
+		t.Fatalf("decode MRA superclass: %v", err)
+	}
+	mraProperties := make(map[string]mraProperty)
+	for _, property := range slices.Concat(superclass.Properties, device.Properties) {
+		mraProperties[property.ShortName] = property
 	}
 
 	className := metricSnakeCase(device.ShortName)
 	for _, descriptor := range descriptors {
-		properties := mraProperties[descriptor.propertyShortName]
-		if len(properties) != 1 {
-			t.Errorf("%s: metric descriptor must match exactly one MRA property by shortName, got %d matches for %q",
-				classCode, len(properties), descriptor.propertyShortName)
+		mra, ok := mraProperties[descriptor.propertyShortName]
+		if !ok {
+			t.Errorf("%s: no MRA property with shortName %q", classCode, descriptor.propertyShortName)
 			continue
 		}
-		mra := properties[0]
 		if mra.PropertyName.English == "" {
 			t.Errorf("%s/%s: MRA property %q must provide propertyName.en", classCode, mra.EPC, mra.ShortName)
 			continue
@@ -101,20 +107,22 @@ func assertMRAMetricConventions(t *testing.T, registry *prometheus.Registry, cla
 			nameParts = append(nameParts, "total")
 		}
 		wantName := strings.Join(nameParts, "_")
+		wantHelp := mra.PropertyName.English + ". EPC=" + mra.EPC
+		// Check descriptor metadata even when the fixture has no sample for it.
+		wantDesc := fmt.Sprintf("Desc{fqName: %q, help: %q,", wantName, wantHelp)
+		if !strings.HasPrefix(descriptor.desc.String(), wantDesc) {
+			t.Errorf("%s/%s: got %s, want name %q and HELP %q", classCode, mra.EPC, descriptor.desc, wantName, wantHelp)
+		}
 		index, ok := unmatched[wantName]
 		if !ok {
-			t.Errorf("%s/%s: missing metric family %q\n"+
-				"Use echonetlite_<class>_<property> with MRA shortNames %q and %q in snake_case. "+
-				"Omit instantaneous and cumulative only as property reading qualifiers. Append the base unit where applicable, then _total for counters.",
-				classCode, mra.EPC, wantName, device.ShortName, mra.ShortName)
+			// An unsupported or unavailable property has a descriptor and no sample.
 			continue
 		}
 		delete(unmatched, wantName)
 
 		family := families[index]
-		if wantHelp := mra.PropertyName.English + ". EPC=" + mra.EPC; family.GetHelp() != wantHelp {
-			t.Errorf("%s/%s: %s HELP = %q, want %q (MRA propertyName.en followed by a period and the EPC)",
-				classCode, mra.EPC, wantName, family.GetHelp(), wantHelp)
+		if family.GetHelp() != wantHelp {
+			t.Errorf("%s/%s: %s HELP = %q, want %q", classCode, mra.EPC, wantName, family.GetHelp(), wantHelp)
 		}
 		if gotType := family.GetType().String(); gotType != wantType {
 			t.Errorf("%s/%s: %s type = %s, want %s (instantaneous readings and states use gauges, cumulative readings use counters)",

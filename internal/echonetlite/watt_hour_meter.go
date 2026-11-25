@@ -3,6 +3,7 @@ package echonetlite
 import (
 	"context"
 	"fmt"
+	"maps"
 	"math"
 )
 
@@ -12,6 +13,8 @@ const (
 )
 
 type WattHourMeter struct {
+	SuperClass
+
 	CumulativeElectricEnergy              uint32
 	CumulativeAmountsOfElectricEnergyUnit float64 // kWh per count
 }
@@ -38,8 +41,39 @@ func (c *WattHourMeterClient) Get(ctx context.Context, host string, eoj EOJ) (*W
 	if err != nil {
 		return nil, fmt.Errorf("cumulativeAmountsOfElectricEnergyUnit (EPC 0xE2): %w", err)
 	}
-	return &WattHourMeter{
+	reading := &WattHourMeter{
 		CumulativeElectricEnergy:              energy,
 		CumulativeAmountsOfElectricEnergyUnit: math.Pow10(-int(unit)),
-	}, nil
+	}
+
+	supported, err := read.readableProperties(ctx)
+	if err != nil {
+		return nil, err
+	}
+	monitoringRequired, monitoringOptional := superClassEPCs(supported)
+	monitoringValues, err := read.group(ctx, monitoringRequired, monitoringOptional)
+	if err != nil {
+		return nil, err
+	}
+	var individual []uint8
+	// Retry optional EPCs omitted from a short Get_SNA.
+	for _, epc := range monitoringOptional {
+		if _, present := monitoringValues[epc]; !present {
+			individual = append(individual, epc)
+		}
+	}
+	if len(individual) != 0 {
+		additional, err := read.optionalIndividually(ctx, individual)
+		if err != nil {
+			return nil, err
+		}
+		maps.Copy(monitoringValues, additional)
+	}
+
+	reading.SuperClass, err = decodeSuperClass(monitoringValues)
+	if err != nil {
+		return nil, err
+	}
+
+	return reading, nil
 }

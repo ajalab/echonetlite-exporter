@@ -54,7 +54,15 @@ func NewDRElectricEnergyMeterCollector(
 		"Measured cumulative amounts of electric energy (output during a power outage)",
 		deviceLabels,
 	)
-	descs := []metricDescriptor{acPower, independentPower, inputEnergy, outputEnergy, independentEnergy}
+	const prefix = "echonetlite_dr_electric_energy_meter_"
+	timeSynchronizationStatus := newMetricDescriptor(0xDB, "timeSynchronizationStatus", "", gaugeReading,
+		prefix+"time_synchronization_status", "Time synchronization status", deviceLabels)
+	superClass := newSuperClassMetrics(prefix)
+	descs := []metricDescriptor{
+		acPower, independentPower, inputEnergy, outputEnergy, independentEnergy,
+		timeSynchronizationStatus,
+	}
+	descs = append(descs, superClass.descriptors()...)
 	return &DRElectricEnergyMeterCollector{
 		collector: newCollector(interval, targets, descs, get,
 			func(device echonetlite.Device, reading *echonetlite.DRElectricEnergyMeter) []prometheus.Metric {
@@ -76,7 +84,11 @@ func NewDRElectricEnergyMeterCollector(
 				if reading.IndependentOperationCumulativeElectricEnergy != nil {
 					metrics = append(metrics, prometheus.MustNewConstMetric(independentEnergy.desc, prometheus.CounterValue, float64(*reading.IndependentOperationCumulativeElectricEnergy)*scale, host, eoj))
 				}
-				return metrics
+
+				if value := reading.TimeSynchronizationStatus; value != nil {
+					metrics = append(metrics, prometheus.MustNewConstMetric(timeSynchronizationStatus.desc, prometheus.GaugeValue, float64(*value), host, eoj))
+				}
+				return superClass.appendSamples(metrics, reading.SuperClass, host, eoj)
 			},
 		),
 	}

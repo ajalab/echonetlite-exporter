@@ -8,10 +8,18 @@ func TestGasMeterGet(t *testing.T) {
 	eoj := EOJ{0x02, 0x82, 0x01}
 	conn := newPropertyTestConnection(t, eoj, propertyExchange{
 		[]uint8{0xE0}, 0x72, []Property{testProperty(0xE0, 0, 0, 0, 100)},
-	})
+	}, propertyExchange{[]uint8{0x9F}, 0x72, []Property{testProperty(0x9F, 5, 0x80, 0x88, 0x9A, 0x9F, 0xE0)}},
+		propertyExchange{[]uint8{0x80, 0x88, 0x9A}, 0x72, []Property{
+			testProperty(0x80, 0x30),
+			testProperty(0x88, 0x42),
+			testProperty(0x9A, 0x44, 0xFF, 0xFF, 0xFF, 0xFE),
+		}})
 	got, err := NewGasMeterClient(conn).Get(t.Context(), "127.0.0.1", eoj)
 	if err != nil || got.CumulativeGasConsumption != 100 {
 		t.Fatalf("Get = (%+v, %v), want consumption count 100", got, err)
+	}
+	if got.HourMeter == nil || *got.HourMeter != 4_294_967_294*86_400 {
+		t.Fatalf("expected the hour meter in seconds: %+v", got)
 	}
 }
 

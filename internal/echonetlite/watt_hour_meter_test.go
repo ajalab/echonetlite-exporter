@@ -19,7 +19,11 @@ func TestWattHourMeterGet(t *testing.T) {
 	} {
 		t.Run(tc.name, func(t *testing.T) {
 			eoj := EOJ{0x02, 0x80, 0x01}
-			conn := newPropertyTestConnection(t, eoj, propertyExchange{[]uint8{0xE0, 0xE2}, tc.esv, tc.response})
+			exchanges := []propertyExchange{{[]uint8{0xE0, 0xE2}, tc.esv, tc.response}}
+			if !tc.wantErr {
+				exchanges = append(exchanges, propertyExchange{[]uint8{0x9F}, 0x72, []Property{testProperty(0x9F, 5, 0x80, 0x88, 0x9F, 0xE0, 0xE2)}}, propertyExchange{[]uint8{0x80, 0x88}, 0x72, []Property{testProperty(0x80, 0x30), testProperty(0x88, 0x42)}})
+			}
+			conn := newPropertyTestConnection(t, eoj, exchanges...)
 			got, err := NewWattHourMeterClient(conn).Get(t.Context(), "127.0.0.1", eoj)
 			if tc.wantErr {
 				if got != nil || err == nil {

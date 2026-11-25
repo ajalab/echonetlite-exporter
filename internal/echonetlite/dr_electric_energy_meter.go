@@ -3,6 +3,7 @@ package echonetlite
 import (
 	"context"
 	"fmt"
+	"maps"
 	"time"
 )
 
@@ -24,6 +25,8 @@ func NewDRElectricEnergyMeterClient(conn *Connection) *DRElectricEnergyMeterClie
 }
 
 type DRElectricEnergyMeter struct {
+	SuperClass
+
 	CumulativeAmountsOfElectricEnergyUnit float64 // kWh per count
 
 	// At least one AC energy direction is supported. Every supported direction is required.
@@ -34,6 +37,8 @@ type DRElectricEnergyMeter struct {
 	IndependentOperationCumulativeElectricEnergy   *uint32
 	ACInstantaneousElectricPower                   *int32
 	IndependentOperationInstantaneousElectricPower *int32
+
+	TimeSynchronizationStatus *uint8
 }
 
 func (c *DRElectricEnergyMeterClient) Get(ctx context.Context, host string, eoj EOJ) (*DRElectricEnergyMeter, error) {
@@ -97,6 +102,43 @@ func (c *DRElectricEnergyMeterClient) Get(ctx context.Context, host string, eoj 
 			return nil, fmt.Errorf("DR meter power (EPC 0x%02X): %w", field.epc, err)
 		}
 		*field.dest = &value
+	}
+
+	monitoringRequired, monitoringOptional := superClassEPCs(supported, 0xDB)
+	monitoringValues, err := read.group(ctx, monitoringRequired, monitoringOptional)
+	if err != nil {
+		return nil, err
+	}
+	var individual []uint8
+	// Retry optional EPCs omitted from a short Get_SNA.
+	for _, epc := range monitoringOptional {
+		if _, present := monitoringValues[epc]; !present {
+			individual = append(individual, epc)
+		}
+	}
+	if len(individual) != 0 {
+		additional, err := read.optionalIndividually(ctx, individual)
+		if err != nil {
+			return nil, err
+		}
+		maps.Copy(monitoringValues, additional)
+	}
+
+	reading.SuperClass, err = decodeSuperClass(monitoringValues)
+	if err != nil {
+		return nil, err
+	}
+
+	if edt := monitoringValues[0xDB]; len(edt) != 0 {
+		if len(edt) != 1 {
+			return nil, fmt.Errorf("EPC 0xDB: expected 1 byte, got %d", len(edt))
+		}
+		switch edt[0] {
+		case 0x00, 0x01, 0x02, 0xFF:
+			reading.TimeSynchronizationStatus = &edt[0]
+		default:
+			return nil, fmt.Errorf("EPC 0xDB: invalid state code 0x%02X", edt[0])
+		}
 	}
 	return reading, nil
 }

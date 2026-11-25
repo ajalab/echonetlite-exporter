@@ -61,10 +61,24 @@ func NewHybridWaterHeaterCollector(
 		"Tank capacity",
 		deviceLabels,
 	)
-	descs := []metricDescriptor{solarLinkage, waterHeating, heater, hotWaterSupply, remainingWater, tankCapacity}
+	const prefix = "echonetlite_hybrid_water_heater_"
+	automaticWaterHeating := newMetricDescriptor(0xB0, "automaticWaterHeating", "", gaugeReading,
+		prefix+"automatic_water_heating", "Automatic water heating setting", deviceLabels)
+	hotWaterSupplyModeForAuxiliaryHeatSourceMachine := newMetricDescriptor(0xB6, "hotWaterSupplyModeForAuxiliaryHeatSourceMachine", "", gaugeReading,
+		prefix+"hot_water_supply_mode_for_auxiliary_heat_source_machine", "Hot water supply mode setting for auxiliary heat source machine", deviceLabels)
+	heaterModeForAuxiliaryHeatSourceMachine := newMetricDescriptor(0xB7, "heaterModeForAuxiliaryHeatSourceMachine", "", gaugeReading,
+		prefix+"heater_mode_for_auxiliary_heat_source_machine", "Heater mode setting for auxiliary heat source machine.", deviceLabels)
+	superClass := newSuperClassMetrics(prefix)
+	descs := []metricDescriptor{
+		solarLinkage, waterHeating, heater, hotWaterSupply, remainingWater, tankCapacity,
+		automaticWaterHeating,
+		hotWaterSupplyModeForAuxiliaryHeatSourceMachine, heaterModeForAuxiliaryHeatSourceMachine,
+	}
+	descs = append(descs, superClass.descriptors()...)
 	return &HybridWaterHeaterCollector{
 		collector: newCollector(interval, targets, descs, get,
 			func(device echonetlite.Device, reading *echonetlite.HybridWaterHeater) []prometheus.Metric {
+				// TODO: Migrate these legacy 0/1 state metrics to ECHONET Lite numeric codes.
 				host, eoj := device.Host(), device.EOJ().String()
 				metrics := []prometheus.Metric{
 					prometheus.MustNewConstMetric(solarLinkage.desc, prometheus.GaugeValue, float64(reading.LinkageModeForSolarPowerGeneration), host, eoj),
@@ -84,7 +98,17 @@ func NewHybridWaterHeaterCollector(
 				if reading.TankCapacity != nil {
 					metrics = append(metrics, prometheus.MustNewConstMetric(tankCapacity.desc, prometheus.GaugeValue, float64(*reading.TankCapacity)/1_000, host, eoj))
 				}
-				return metrics
+
+				if value := reading.AutomaticWaterHeating; value != nil {
+					metrics = append(metrics, prometheus.MustNewConstMetric(automaticWaterHeating.desc, prometheus.GaugeValue, float64(*value), host, eoj))
+				}
+				if value := reading.HotWaterSupplyModeForAuxiliaryHeatSourceMachine; value != nil {
+					metrics = append(metrics, prometheus.MustNewConstMetric(hotWaterSupplyModeForAuxiliaryHeatSourceMachine.desc, prometheus.GaugeValue, float64(*value), host, eoj))
+				}
+				if value := reading.HeaterModeForAuxiliaryHeatSourceMachine; value != nil {
+					metrics = append(metrics, prometheus.MustNewConstMetric(heaterModeForAuxiliaryHeatSourceMachine.desc, prometheus.GaugeValue, float64(*value), host, eoj))
+				}
+				return superClass.appendSamples(metrics, reading.SuperClass, host, eoj)
 			},
 		),
 	}

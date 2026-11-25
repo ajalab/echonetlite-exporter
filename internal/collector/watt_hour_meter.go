@@ -26,14 +26,17 @@ func NewWattHourMeterCollector(
 		"Cumulative amounts of electric energy measurement value",
 		deviceLabels,
 	)
-	descs := []metricDescriptor{energy}
+	const prefix = "echonetlite_watt_hour_meter_"
+	superClass := newSuperClassMetrics(prefix)
+	descs := append([]metricDescriptor{energy}, superClass.descriptors()...)
 	return &WattHourMeterCollector{
 		collector: newCollector(interval, targets, descs, get,
 			func(device echonetlite.Device, reading *echonetlite.WattHourMeter) []prometheus.Metric {
 				host, eoj := device.Host(), device.EOJ().String()
-				return []prometheus.Metric{
+				metrics := []prometheus.Metric{
 					prometheus.MustNewConstMetric(energy.desc, prometheus.CounterValue, float64(reading.CumulativeElectricEnergy)*reading.CumulativeAmountsOfElectricEnergyUnit*joulesPerKilowattHour, host, eoj),
 				}
+				return superClass.appendSamples(metrics, reading.SuperClass, host, eoj)
 			},
 		),
 	}
