@@ -8,6 +8,7 @@ import (
 
 func TestInstantaneousWaterHeaterCollectorPublishesMetrics(t *testing.T) {
 	reading := &echonetlite.InstantaneousWaterHeater{
+		SuperClass:                     echonetlite.SuperClass{OperationStatus: new(uint8(0x30)), FaultStatus: new(uint8(0x42))},
 		HotWaterHeatingStatus:          true,
 		AutomaticBathOperation:         new(false),
 		TargetSuppliedWaterTemperature: new(uint8(42)),
@@ -41,6 +42,12 @@ echonetlite_instantaneous_water_heater_target_bath_water_temperature_celsius{eoj
 # HELP echonetlite_instantaneous_water_heater_target_supplied_water_temperature_celsius Set value of hot water temperature. EPC=0xD1
 # TYPE echonetlite_instantaneous_water_heater_target_supplied_water_temperature_celsius gauge
 echonetlite_instantaneous_water_heater_target_supplied_water_temperature_celsius{eoj="027201",host="192.0.2.10"} 42
+# HELP echonetlite_instantaneous_water_heater_fault_status Fault status. EPC=0x88
+# TYPE echonetlite_instantaneous_water_heater_fault_status gauge
+echonetlite_instantaneous_water_heater_fault_status{eoj="027201",host="192.0.2.10"} 66
+# HELP echonetlite_instantaneous_water_heater_operation_status Operation status. EPC=0x80
+# TYPE echonetlite_instantaneous_water_heater_operation_status gauge
+echonetlite_instantaneous_water_heater_operation_status{eoj="027201",host="192.0.2.10"} 48
 `
 	assertPublishedMetrics(t, NewInstantaneousWaterHeaterCollector, echonetlite.ClassInstantaneousWaterHeater, reading, want)
 }

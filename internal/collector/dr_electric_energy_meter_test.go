@@ -8,6 +8,7 @@ import (
 
 func TestDRElectricEnergyMeterCollectorPublishesMetrics(t *testing.T) {
 	reading := &echonetlite.DRElectricEnergyMeter{
+		SuperClass:                            echonetlite.SuperClass{OperationStatus: new(uint8(0x30)), FaultStatus: new(uint8(0x42))},
 		CumulativeAmountsOfElectricEnergyUnit: 0.1,
 		ACInputCumulativeElectricEnergy:       new(uint32(10)), ACOutputCumulativeElectricEnergy: new(uint32(20)),
 		IndependentOperationCumulativeElectricEnergy: new(uint32(1)),
@@ -29,6 +30,12 @@ echonetlite_dr_electric_energy_meter_independent_operation_electric_energy_joule
 # HELP echonetlite_dr_electric_energy_meter_independent_operation_electric_power_watts Measured instantaneous electric power (output during a power outage). EPC=0xEA
 # TYPE echonetlite_dr_electric_energy_meter_independent_operation_electric_power_watts gauge
 echonetlite_dr_electric_energy_meter_independent_operation_electric_power_watts{eoj="028E01",host="192.0.2.10"} 55
+# HELP echonetlite_dr_electric_energy_meter_fault_status Fault status. EPC=0x88
+# TYPE echonetlite_dr_electric_energy_meter_fault_status gauge
+echonetlite_dr_electric_energy_meter_fault_status{eoj="028E01",host="192.0.2.10"} 66
+# HELP echonetlite_dr_electric_energy_meter_operation_status Operation status. EPC=0x80
+# TYPE echonetlite_dr_electric_energy_meter_operation_status gauge
+echonetlite_dr_electric_energy_meter_operation_status{eoj="028E01",host="192.0.2.10"} 48
 `
 	assertPublishedMetrics(t, NewDRElectricEnergyMeterCollector, echonetlite.ClassDRElectricEnergyMeter, reading, want)
 }

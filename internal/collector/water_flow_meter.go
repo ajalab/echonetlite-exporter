@@ -26,14 +26,33 @@ func NewWaterFlowMeterCollector(
 		"Measured cumulative amount of flowing water",
 		deviceLabels,
 	)
-	descs := []metricDescriptor{flow}
+	const prefix = "echonetlite_water_flow_meter_"
+	abnormalDetection := newMetricDescriptor(0xE3, "abnormalDetection", "", gaugeReading,
+		prefix+"abnormal_detection", "Detection of abnormal value in metering data", deviceLabels)
+	securityDataInformation := newMetricDescriptor(0xE4, "securityDataInformation", "", gaugeReading,
+		prefix+"security_data_information", "Security data information", deviceLabels)
+	superClass := newSuperClassMetrics(prefix)
+	descs := []metricDescriptor{
+		flow,
+		abnormalDetection,
+		securityDataInformation,
+	}
+	descs = append(descs, superClass.descriptors()...)
 	return &WaterFlowMeterCollector{
 		collector: newCollector(interval, targets, descs, get,
 			func(device echonetlite.Device, reading *echonetlite.WaterFlowMeter) []prometheus.Metric {
 				host, eoj := device.Host(), device.EOJ().String()
-				return []prometheus.Metric{
+				metrics := []prometheus.Metric{
 					prometheus.MustNewConstMetric(flow.desc, prometheus.CounterValue, float64(reading.CumulativeFlowingWater)*reading.UnitForCumulativeFlowingWater, host, eoj),
 				}
+
+				if value := reading.AbnormalDetection; value != nil {
+					metrics = append(metrics, prometheus.MustNewConstMetric(abnormalDetection.desc, prometheus.GaugeValue, float64(*value), host, eoj))
+				}
+				if value := reading.SecurityDataInformation; value != nil {
+					metrics = append(metrics, prometheus.MustNewConstMetric(securityDataInformation.desc, prometheus.GaugeValue, float64(*value), host, eoj))
+				}
+				return superClass.appendSamples(metrics, reading.SuperClass, host, eoj)
 			},
 		),
 	}

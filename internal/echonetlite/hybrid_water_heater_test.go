@@ -15,6 +15,7 @@ func TestHybridWaterHeaterGetWithBitmapPropertyMap(t *testing.T) {
 		propertyExchange{[]uint8{0xB3}, 0x72, []Property{testProperty(0xB3, 0x42)}},
 		propertyExchange{[]uint8{0xE1}, 0x72, []Property{testProperty(0xE1, 0, 150)}},
 		propertyExchange{[]uint8{0xE2}, 0x52, []Property{testProperty(0xE2)}},
+		propertyExchange{[]uint8{0x80, 0x88}, 0x72, []Property{testProperty(0x80, 0x30), testProperty(0x88, 0x42)}},
 	)
 	got, err := NewHybridWaterHeaterClient(conn).Get(t.Context(), "127.0.0.1", eoj)
 	if err != nil {

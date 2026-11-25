@@ -8,6 +8,7 @@ import (
 
 func TestHybridWaterHeaterCollectorPublishesMetrics(t *testing.T) {
 	reading := &echonetlite.HybridWaterHeater{
+		SuperClass:                         echonetlite.SuperClass{OperationStatus: new(uint8(0x30)), FaultStatus: new(uint8(0x42))},
 		LinkageModeForSolarPowerGeneration: 0x42,
 		WaterHeatingStatus:                 new(true), HeaterStatus: new(false), HotWaterSupplyStatus: new(true),
 		RemainingWater: new(uint16(150)), TankCapacity: new(uint16(200)),
@@ -31,6 +32,12 @@ echonetlite_hybrid_water_heater_tank_capacity_cubic_meters{eoj="02A601",host="19
 # HELP echonetlite_hybrid_water_heater_water_heating_status Water heating status. EPC=0xB2
 # TYPE echonetlite_hybrid_water_heater_water_heating_status gauge
 echonetlite_hybrid_water_heater_water_heating_status{eoj="02A601",host="192.0.2.10"} 1
+# HELP echonetlite_hybrid_water_heater_fault_status Fault status. EPC=0x88
+# TYPE echonetlite_hybrid_water_heater_fault_status gauge
+echonetlite_hybrid_water_heater_fault_status{eoj="02A601",host="192.0.2.10"} 66
+# HELP echonetlite_hybrid_water_heater_operation_status Operation status. EPC=0x80
+# TYPE echonetlite_hybrid_water_heater_operation_status gauge
+echonetlite_hybrid_water_heater_operation_status{eoj="02A601",host="192.0.2.10"} 48
 `
 	assertPublishedMetrics(t, NewHybridWaterHeaterCollector, echonetlite.ClassHybridWaterHeater, reading, want)
 }

@@ -27,6 +27,8 @@ func TestDRElectricEnergyMeterGet(t *testing.T) {
 				}},
 			},
 			want: &DRElectricEnergyMeter{
+				SuperClass:                            SuperClass{OperationStatus: new(uint8(0x30)), FaultStatus: new(uint8(0x42))},
+				TimeSynchronizationStatus:             new(uint8(0xFF)),
 				CumulativeAmountsOfElectricEnergyUnit: 0.1,
 				ACInputCumulativeElectricEnergy:       new(uint32(100)),
 			},
@@ -39,6 +41,8 @@ func TestDRElectricEnergyMeterGet(t *testing.T) {
 				{[]uint8{0xE2, 0xE9, 0xEA}, 0x52, []Property{output, testProperty(0xE9, 0xFF, 0xFF, 0xFF, 0x9C), testProperty(0xEA)}},
 			},
 			want: &DRElectricEnergyMeter{
+				SuperClass:                            SuperClass{OperationStatus: new(uint8(0x30)), FaultStatus: new(uint8(0x42))},
+				TimeSynchronizationStatus:             new(uint8(0xFF)),
 				CumulativeAmountsOfElectricEnergyUnit: 0.1,
 				ACOutputCumulativeElectricEnergy:      new(uint32(200)),
 				ACInstantaneousElectricPower:          new(int32(-100)),
@@ -52,6 +56,8 @@ func TestDRElectricEnergyMeterGet(t *testing.T) {
 				{[]uint8{0xE0, 0xE2}, 0x72, []Property{input, output}},
 			},
 			want: &DRElectricEnergyMeter{
+				SuperClass:                            SuperClass{OperationStatus: new(uint8(0x30)), FaultStatus: new(uint8(0x42))},
+				TimeSynchronizationStatus:             new(uint8(0xFF)),
 				CumulativeAmountsOfElectricEnergyUnit: 0.1,
 				ACInputCumulativeElectricEnergy:       new(uint32(100)),
 				ACOutputCumulativeElectricEnergy:      new(uint32(200)),
@@ -104,6 +110,13 @@ func TestDRElectricEnergyMeterGet(t *testing.T) {
 		t.Run(tc.name, func(t *testing.T) {
 			mapEDT := append([]byte{byte(len(tc.readable))}, tc.readable...)
 			exchanges := append([]propertyExchange{{[]uint8{0x9F}, 0x72, []Property{testProperty(0x9F, mapEDT...)}}}, tc.exchanges...)
+			if tc.want != nil {
+				exchanges = append(exchanges, propertyExchange{[]uint8{0x80, 0x88, 0xDB}, 0x72, []Property{
+					testProperty(0x80, 0x30),
+					testProperty(0x88, 0x42),
+					testProperty(0xDB, 0xFF),
+				}})
+			}
 			conn := newPropertyTestConnection(t, eoj, exchanges...)
 			got, err := NewDRElectricEnergyMeterClient(conn).Get(t.Context(), "127.0.0.1", eoj)
 			if (err == nil) != (tc.want != nil) || !reflect.DeepEqual(got, tc.want) {

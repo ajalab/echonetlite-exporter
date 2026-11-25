@@ -8,6 +8,7 @@ import (
 
 func TestMultipleInputPCSCollectorPublishesMetrics(t *testing.T) {
 	reading := &echonetlite.MultipleInputPCS{
+		SuperClass:                    echonetlite.SuperClass{OperationStatus: new(uint8(0x30)), FaultStatus: new(uint8(0x42))},
 		NormalDirectionElectricEnergy: 10, ReverseDirectionElectricEnergy: 20,
 		InstantaneousElectricPower: -100,
 	}
@@ -21,6 +22,12 @@ echonetlite_multiple_input_pcs_normal_direction_electric_energy_joules_total{eoj
 # HELP echonetlite_multiple_input_pcs_reverse_direction_electric_energy_joules_total Measured cumulative amount of electric energy (reverse direction). EPC=0xE3
 # TYPE echonetlite_multiple_input_pcs_reverse_direction_electric_energy_joules_total counter
 echonetlite_multiple_input_pcs_reverse_direction_electric_energy_joules_total{eoj="02A501",host="192.0.2.10"} 72000
+# HELP echonetlite_multiple_input_pcs_fault_status Fault status. EPC=0x88
+# TYPE echonetlite_multiple_input_pcs_fault_status gauge
+echonetlite_multiple_input_pcs_fault_status{eoj="02A501",host="192.0.2.10"} 66
+# HELP echonetlite_multiple_input_pcs_operation_status Operation status. EPC=0x80
+# TYPE echonetlite_multiple_input_pcs_operation_status gauge
+echonetlite_multiple_input_pcs_operation_status{eoj="02A501",host="192.0.2.10"} 48
 `
 	assertPublishedMetrics(t, NewMultipleInputPCSCollector, echonetlite.ClassMultipleInputPCS, reading, want)
 }

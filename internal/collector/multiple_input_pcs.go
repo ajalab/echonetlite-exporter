@@ -40,16 +40,29 @@ func NewMultipleInputPCSCollector(
 		"Measured cumulative amount of electric energy (reverse direction)",
 		deviceLabels,
 	)
-	descs := []metricDescriptor{power, normalEnergy, reverseEnergy}
+	const prefix = "echonetlite_multiple_input_pcs_"
+	powerSystemInterconnectionStatus := newMetricDescriptor(0xD0, "powerSystemInterconnectionStatus", "", gaugeReading,
+		prefix+"power_system_interconnection_status", "System interconnection status", deviceLabels)
+	superClass := newSuperClassMetrics(prefix)
+	descs := []metricDescriptor{
+		power, normalEnergy, reverseEnergy,
+		powerSystemInterconnectionStatus,
+	}
+	descs = append(descs, superClass.descriptors()...)
 	return &MultipleInputPCSCollector{
 		collector: newCollector(interval, targets, descs, get,
 			func(device echonetlite.Device, reading *echonetlite.MultipleInputPCS) []prometheus.Metric {
 				host, eoj := device.Host(), device.EOJ().String()
-				return []prometheus.Metric{
+				metrics := []prometheus.Metric{
 					prometheus.MustNewConstMetric(power.desc, prometheus.GaugeValue, float64(reading.InstantaneousElectricPower), host, eoj),
 					prometheus.MustNewConstMetric(normalEnergy.desc, prometheus.CounterValue, float64(reading.NormalDirectionElectricEnergy)*joulesPerWattHour, host, eoj),
 					prometheus.MustNewConstMetric(reverseEnergy.desc, prometheus.CounterValue, float64(reading.ReverseDirectionElectricEnergy)*joulesPerWattHour, host, eoj),
 				}
+
+				if value := reading.PowerSystemInterconnectionStatus; value != nil {
+					metrics = append(metrics, prometheus.MustNewConstMetric(powerSystemInterconnectionStatus.desc, prometheus.GaugeValue, float64(*value), host, eoj))
+				}
+				return superClass.appendSamples(metrics, reading.SuperClass, host, eoj)
 			},
 		),
 	}

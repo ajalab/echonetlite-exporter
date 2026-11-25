@@ -2,6 +2,7 @@ package echonetlite
 
 import (
 	"context"
+	"encoding/binary"
 	"fmt"
 	"maps"
 	"time"
@@ -19,6 +20,8 @@ const (
 )
 
 type InstantaneousWaterHeater struct {
+	SuperClass
+
 	HotWaterHeatingStatus          bool
 	BathWaterHeatingStatus         bool
 	AutomaticBathOperation         *bool
@@ -27,6 +30,15 @@ type InstantaneousWaterHeater struct {
 	ShowerHotWaterSupplyStatus     *bool
 	KitchenHotWaterSupplyStatus    *bool
 	BathOperationStatus            *uint8
+
+	HotWaterWarmerSetting               *uint8
+	RemainingAutomaticOperationTime     *uint32
+	TargetBathAdditionalBoilupOperation *uint8
+	BathHotWaterAddition                *uint8
+	BathLukewarmWaterFunction           *uint8
+	BathWaterVolume1                    *uint8
+	BathroomPriority                    *uint8
+	BathWaterVolume3                    *uint16
 }
 
 type InstantaneousWaterHeaterClient struct {
@@ -106,6 +118,81 @@ func (c *InstantaneousWaterHeaterClient) Get(ctx context.Context, host string, e
 			return nil, fmt.Errorf("water heater property (EPC 0x%02X): %w", field.epc, err)
 		}
 		*field.dest = &value
+	}
+
+	monitoringRequired, monitoringOptional := superClassEPCs(supported)
+	monitoringValues, err := read.group(ctx, monitoringRequired, monitoringOptional)
+	if err != nil {
+		return nil, err
+	}
+	individual := supportedEPCs(supported, 0xD2, 0xDB, 0xE4, 0xE5, 0xE6, 0xE7, 0xE9, 0xEE)
+	// Retry optional EPCs omitted from a short Get_SNA.
+	for _, epc := range monitoringOptional {
+		if _, present := monitoringValues[epc]; !present {
+			individual = append(individual, epc)
+		}
+	}
+	if len(individual) != 0 {
+		additional, err := read.optionalIndividually(ctx, individual)
+		if err != nil {
+			return nil, err
+		}
+		maps.Copy(monitoringValues, additional)
+	}
+
+	reading.SuperClass, err = decodeSuperClass(monitoringValues)
+	if err != nil {
+		return nil, err
+	}
+
+	for _, field := range []struct {
+		epc      uint8
+		min, max uint8
+		dest     **uint8
+	}{
+		{0xD2, 0x41, 0x42, &reading.HotWaterWarmerSetting},
+		{0xE4, 0x41, 0x42, &reading.TargetBathAdditionalBoilupOperation},
+		{0xE5, 0x41, 0x42, &reading.BathHotWaterAddition},
+		{0xE6, 0x41, 0x42, &reading.BathLukewarmWaterFunction},
+		{0xE9, 0x41, 0x42, &reading.BathroomPriority},
+	} {
+		edt := monitoringValues[field.epc]
+		if len(edt) == 0 {
+			continue
+		}
+		value, err := decodeByte(edt, field.min, field.max)
+		if err != nil {
+			return nil, fmt.Errorf("EPC 0x%02X: %w", field.epc, err)
+		}
+		*field.dest = &value
+	}
+	// The two highest codes in each bath volume property denote underflow and overflow.
+	if edt := monitoringValues[0xE7]; len(edt) != 0 {
+		if len(edt) != 1 {
+			return nil, fmt.Errorf("EPC 0xE7: expected 1 byte, got %d", len(edt))
+		}
+		if edt[0] < 0xFE {
+			reading.BathWaterVolume1 = &edt[0]
+		}
+	}
+	if edt := monitoringValues[0xEE]; len(edt) != 0 {
+		if len(edt) != 2 {
+			return nil, fmt.Errorf("EPC 0xEE: expected 2 bytes, got %d", len(edt))
+		}
+		value := binary.BigEndian.Uint16(edt)
+		if value < 0xFFFE {
+			reading.BathWaterVolume3 = &value
+		}
+	}
+	if edt := monitoringValues[0xDB]; len(edt) != 0 {
+		switch {
+		case len(edt) == 2 && edt[0] == 0xFF && edt[1] == 0xFF:
+			// The device reports unlimited remaining time.
+		case len(edt) == 2 && edt[0] <= 23 && edt[1] <= 59:
+			reading.RemainingAutomaticOperationTime = new(uint32(edt[0])*3600 + uint32(edt[1])*60)
+		default:
+			return nil, fmt.Errorf("EPC 0xDB: invalid remaining automatic operation time: %X", edt)
+		}
 	}
 	return reading, nil
 }

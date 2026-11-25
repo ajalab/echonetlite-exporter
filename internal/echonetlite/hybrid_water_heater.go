@@ -18,12 +18,18 @@ const (
 )
 
 type HybridWaterHeater struct {
+	SuperClass
+
 	LinkageModeForSolarPowerGeneration uint8
 	WaterHeatingStatus                 *bool
 	HeaterStatus                       *bool
 	HotWaterSupplyStatus               *bool
 	RemainingWater                     *uint16 // L
 	TankCapacity                       *uint16 // L
+
+	AutomaticWaterHeating                           *uint8
+	HotWaterSupplyModeForAuxiliaryHeatSourceMachine *uint8
+	HeaterModeForAuxiliaryHeatSourceMachine         *uint8
 }
 
 type HybridWaterHeaterClient struct {
@@ -90,6 +96,51 @@ func (c *HybridWaterHeaterClient) Get(ctx context.Context, host string, eoj EOJ)
 		value, err := decodeWaterVolume(edt)
 		if err != nil {
 			return nil, fmt.Errorf("water volume (EPC 0x%02X): %w", field.epc, err)
+		}
+		*field.dest = &value
+	}
+
+	monitoringRequired, monitoringOptional := superClassEPCs(supported)
+	monitoringValues, err := read.group(ctx, monitoringRequired, monitoringOptional)
+	if err != nil {
+		return nil, err
+	}
+	individual := supportedEPCs(supported, 0xB0, 0xB6, 0xB7)
+	// Retry optional EPCs omitted from a short Get_SNA.
+	for _, epc := range monitoringOptional {
+		if _, present := monitoringValues[epc]; !present {
+			individual = append(individual, epc)
+		}
+	}
+	if len(individual) != 0 {
+		additional, err := read.optionalIndividually(ctx, individual)
+		if err != nil {
+			return nil, err
+		}
+		maps.Copy(monitoringValues, additional)
+	}
+
+	reading.SuperClass, err = decodeSuperClass(monitoringValues)
+	if err != nil {
+		return nil, err
+	}
+
+	for _, field := range []struct {
+		epc      uint8
+		min, max uint8
+		dest     **uint8
+	}{
+		{0xB0, 0x41, 0x43, &reading.AutomaticWaterHeating},
+		{0xB6, 0x41, 0x42, &reading.HotWaterSupplyModeForAuxiliaryHeatSourceMachine},
+		{0xB7, 0x41, 0x42, &reading.HeaterModeForAuxiliaryHeatSourceMachine},
+	} {
+		edt := monitoringValues[field.epc]
+		if len(edt) == 0 {
+			continue
+		}
+		value, err := decodeByte(edt, field.min, field.max)
+		if err != nil {
+			return nil, fmt.Errorf("EPC 0x%02X: %w", field.epc, err)
 		}
 		*field.dest = &value
 	}
