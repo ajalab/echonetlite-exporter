@@ -19,7 +19,7 @@ func NewWattHourMeterCollector(
 	interval time.Duration,
 	targets []echonetlite.Device,
 ) *WattHourMeterCollector {
-	energy := newMetricDescriptor(
+	energy := newPropertyMetricDescriptor(
 		echonetlite.EPCCumulativeElectricEnergy,
 		"cumulativeElectricEnergy", "joules", cumulativeReading,
 		"echonetlite_watt_hour_meter_electric_energy_joules_total",
@@ -27,7 +27,7 @@ func NewWattHourMeterCollector(
 		deviceLabels,
 	)
 	const prefix = "echonetlite_watt_hour_meter_"
-	superClass := newSuperClassMetrics(prefix)
+	superClass := newSuperClassMetrics(prefix, superClassOperationStatusValues)
 	descs := append([]metricDescriptor{energy}, superClass.descriptors()...)
 	return &WattHourMeterCollector{
 		collector: newCollector(interval, targets, descs, get,

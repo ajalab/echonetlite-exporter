@@ -21,14 +21,14 @@ func NewPowerDistributionBoardMeteringCollector(
 	targets []echonetlite.Device,
 ) *PowerDistributionBoardMeteringCollector {
 	labels := []string{"host", "eoj", "channel"}
-	power := newMetricDescriptor(
+	power := newPropertyMetricDescriptor(
 		echonetlite.EPCInstantaneousElectricPowerListSimplex,
 		"instantaneousElectricPowerListSimplex", "watts", instantaneousReading,
 		"echonetlite_power_distribution_board_metering_electric_power_list_simplex_watts",
 		"Measured instantaneous power consumption list (simplex)",
 		labels,
 	)
-	energy := newMetricDescriptor(
+	energy := newPropertyMetricDescriptor(
 		echonetlite.EPCCumulativeElectricEnergyListSimplex,
 		"cumulativeElectricEnergyListSimplex", "joules", cumulativeReading,
 		"echonetlite_power_distribution_board_metering_electric_energy_list_simplex_joules_total",
@@ -36,35 +36,35 @@ func NewPowerDistributionBoardMeteringCollector(
 		labels,
 	)
 	const prefix = "echonetlite_power_distribution_board_metering_"
-	masterRatedCapacity := newMetricDescriptor(0xB0, "masterRatedCapacity", "amperes", gaugeReading,
+	masterRatedCapacity := newPropertyMetricDescriptor(0xB0, "masterRatedCapacity", "amperes", gaugeReading,
 		prefix+"master_rated_capacity_amperes", "Master rated capacity", deviceLabels)
-	numberOfMeasurementChannelsSimplex := newMetricDescriptor(0xB1, "numberOfMeasurementChannelsSimplex", "", gaugeReading,
+	numberOfMeasurementChannelsSimplex := newPropertyMetricDescriptor(0xB1, "numberOfMeasurementChannelsSimplex", "", gaugeReading,
 		prefix+"number_of_measurement_channels_simplex", "Number of measurement channels (simplex)", deviceLabels)
-	numberOfMeasurementChannelsDuplex := newMetricDescriptor(0xB8, "numberOfMeasurementChannelsDuplex", "", gaugeReading,
+	numberOfMeasurementChannelsDuplex := newPropertyMetricDescriptor(0xB8, "numberOfMeasurementChannelsDuplex", "", gaugeReading,
 		prefix+"number_of_measurement_channels_duplex", "Number of measurement channels (duplex)", deviceLabels)
-	normalDirectionCumulativeElectricEnergy := newMetricDescriptor(0xC0, "normalDirectionCumulativeElectricEnergy", "joules", cumulativeReading,
+	normalDirectionCumulativeElectricEnergy := newPropertyMetricDescriptor(0xC0, "normalDirectionCumulativeElectricEnergy", "joules", cumulativeReading,
 		prefix+"normal_direction_electric_energy_joules_total", "Measured cumulative amount of electric energy (normal direction)", deviceLabels)
-	reverseDirectionCumulativeElectricEnergy := newMetricDescriptor(0xC1, "reverseDirectionCumulativeElectricEnergy", "joules", cumulativeReading,
+	reverseDirectionCumulativeElectricEnergy := newPropertyMetricDescriptor(0xC1, "reverseDirectionCumulativeElectricEnergy", "joules", cumulativeReading,
 		prefix+"reverse_direction_electric_energy_joules_total", "Measured cumulative amount of electric energy (reverse direction)", deviceLabels)
-	instantaneousElectricPower := newMetricDescriptor(0xC6, "instantaneousElectricPower", "watts", instantaneousReading,
+	instantaneousElectricPower := newPropertyMetricDescriptor(0xC6, "instantaneousElectricPower", "watts", instantaneousReading,
 		prefix+"electric_power_watts", "Measured instantaneous amount of electric energy", deviceLabels)
 	phaseLabels := []string{"host", "eoj", "phase"}
 	channelPhaseLabels := []string{"host", "eoj", "channel", "phase"}
 	directionLabels := []string{"host", "eoj", "channel", "direction"}
 	voltageLabels := []string{"host", "eoj", "line_pair"}
-	currentSimplex := newMetricDescriptor(0xB5, "instantaneousCurrentListSimplex", "amperes", instantaneousReading,
+	currentSimplex := newPropertyMetricDescriptor(0xB5, "instantaneousCurrentListSimplex", "amperes", instantaneousReading,
 		prefix+"current_list_simplex_amperes", "Measured instantaneous current list (simplex)", channelPhaseLabels)
-	energyDuplex := newMetricDescriptor(0xBA, "cumulativeElectricEnergyListDuplex", "joules", cumulativeReading,
+	energyDuplex := newPropertyMetricDescriptor(0xBA, "cumulativeElectricEnergyListDuplex", "joules", cumulativeReading,
 		prefix+"electric_energy_list_duplex_joules_total", "Measured cumulative amount of electric power consumption list (duplex)", directionLabels)
-	currentDuplex := newMetricDescriptor(0xBC, "instantaneousCurrentListDuplex", "amperes", instantaneousReading,
+	currentDuplex := newPropertyMetricDescriptor(0xBC, "instantaneousCurrentListDuplex", "amperes", instantaneousReading,
 		prefix+"current_list_duplex_amperes", "Measured instantaneous current list (duplex)", channelPhaseLabels)
-	powerDuplex := newMetricDescriptor(0xBE, "instantaneousElectricPowerListDuplex", "watts", instantaneousReading,
+	powerDuplex := newPropertyMetricDescriptor(0xBE, "instantaneousElectricPowerListDuplex", "watts", instantaneousReading,
 		prefix+"electric_power_list_duplex_watts", "Measured instantaneous power consumption list (duplex)", labels)
-	current := newMetricDescriptor(0xC7, "instantaneousCurrent", "amperes", instantaneousReading,
+	current := newPropertyMetricDescriptor(0xC7, "instantaneousCurrent", "amperes", instantaneousReading,
 		prefix+"current_amperes", "Measured instantaneous currents", phaseLabels)
-	voltage := newMetricDescriptor(0xC8, "instantaneousVoltage", "volts", instantaneousReading,
+	voltage := newPropertyMetricDescriptor(0xC8, "instantaneousVoltage", "volts", instantaneousReading,
 		prefix+"voltage_volts", "Measured instantaneous voltages", voltageLabels)
-	superClass := newSuperClassMetrics(prefix)
+	superClass := newSuperClassMetrics(prefix, superClassOperationStatusValues)
 	descs := []metricDescriptor{
 		power, energy,
 		masterRatedCapacity,
@@ -79,9 +79,9 @@ func NewPowerDistributionBoardMeteringCollector(
 		epc := 0xD0 + uint8(i)
 		shortName := "measurementChannel" + channel
 		help := "Measurement channel " + channel
-		channelEnergy[i] = newMetricDescriptor(epc, shortName, "joules", cumulativeReading,
+		channelEnergy[i] = newPropertyMetricDescriptor(epc, shortName, "joules", cumulativeReading,
 			prefix+"measurement_channel"+channel+"_joules_total", help, deviceLabels)
-		channelCurrent[i] = newMetricDescriptor(epc, shortName, "amperes", instantaneousReading,
+		channelCurrent[i] = newPropertyMetricDescriptor(epc, shortName, "amperes", instantaneousReading,
 			prefix+"measurement_channel"+channel+"_amperes", help, phaseLabels)
 		descs = append(descs, channelEnergy[i], channelCurrent[i])
 	}

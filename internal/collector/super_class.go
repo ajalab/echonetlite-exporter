@@ -17,25 +17,32 @@ type superClassMetrics struct {
 	hourMeter                             metricDescriptor
 }
 
-func newSuperClassMetrics(prefix string) superClassMetrics {
+const superClassOperationStatusValues = `{"48":"ON","49":"OFF"}`
+
+func newSuperClassMetrics(prefix, operationStatusValues string) superClassMetrics {
 	return superClassMetrics{
-		operationStatus: newMetricDescriptor(echonetlite.EPCOperationStatus, "operationStatus", "", gaugeReading,
-			prefix+"operation_status", "Operation status", deviceLabels),
-		instantaneousElectricPowerConsumption: newMetricDescriptor(echonetlite.EPCInstantaneousElectricPowerConsumption, "instantaneousElectricPowerConsumption", "watts", instantaneousReading,
+		operationStatus: newPropertyMetricDescriptorWithValues(echonetlite.EPCOperationStatus, "operationStatus",
+			prefix+"operation_status", "Operation status", operationStatusValues),
+		instantaneousElectricPowerConsumption: newPropertyMetricDescriptor(echonetlite.EPCInstantaneousElectricPowerConsumption, "instantaneousElectricPowerConsumption", "watts", instantaneousReading,
 			prefix+"electric_power_consumption_watts", "Measured instantaneous power consumption", deviceLabels),
-		consumedCumulativeElectricEnergy: newMetricDescriptor(echonetlite.EPCConsumedCumulativeElectricEnergy, "consumedCumulativeElectricEnergy", "joules", cumulativeReading,
+		consumedCumulativeElectricEnergy: newPropertyMetricDescriptor(echonetlite.EPCConsumedCumulativeElectricEnergy, "consumedCumulativeElectricEnergy", "joules", cumulativeReading,
 			prefix+"consumed_electric_energy_joules_total", "Measured cumulative electric energy consumption", deviceLabels),
-		currentLimit: newMetricDescriptor(echonetlite.EPCCurrentLimit, "currentLimit", "ratio", gaugeReading,
+		currentLimit: newPropertyMetricDescriptor(echonetlite.EPCCurrentLimit, "currentLimit", "ratio", gaugeReading,
 			prefix+"current_limit_ratio", "Current limit setting", deviceLabels),
-		faultStatus: newMetricDescriptor(echonetlite.EPCFaultStatus, "faultStatus", "", gaugeReading,
-			prefix+"fault_status", "Fault status", deviceLabels),
-		faultDescription: newMetricDescriptor(echonetlite.EPCFaultDescription, "faultDescription", "", gaugeReading,
-			prefix+"fault_description", "Fault description", deviceLabels),
-		powerSaving: newMetricDescriptor(echonetlite.EPCPowerSaving, "powerSaving", "", gaugeReading,
-			prefix+"power_saving", "Power-saving operation setting", deviceLabels),
-		powerLimit: newMetricDescriptor(echonetlite.EPCPowerLimit, "powerLimit", "watts", gaugeReading,
+		faultStatus: newPropertyMetricDescriptorWithValues(echonetlite.EPCFaultStatus, "faultStatus",
+			prefix+"fault_status", "Fault status", `{"65":"Fault occurred.","66":"No fault has occurred."}`),
+		faultDescription: newPropertyMetricDescriptorWithValues(echonetlite.EPCFaultDescription, "faultDescription",
+			prefix+"fault_description", "Fault description", `{"0":"No fault","1":"Faults that can be recovered from by turn off the power or unplug and reoperate.","2":"Faults that can be recovered from by pressing the reset button.",`+
+				`"3":"Device set incorrectly","4":"Supply","5":"Cleaning (filters, etc.)",`+
+				`"6":"Changing the battery","7":"Recover operation no required","9":"User-definable domain 1",`+
+				`"10...19":"Abnormal event or the tripping of a safety device.","20...29":"Fault in a switch","30...59":"Fault in the sensor system",`+
+				`"60...89":"Fault in a component such as an actuator.","90...110":"Fault in a control circuit board.","111...1000":"User-definable domain 2",`+
+				`"1001":"Repair location unknown","1023":"Fault"}`),
+		powerSaving: newPropertyMetricDescriptorWithValues(echonetlite.EPCPowerSaving, "powerSaving",
+			prefix+"power_saving", "Power-saving operation setting", `{"65":"Power saving Operation","66":"Normal Operation"}`),
+		powerLimit: newPropertyMetricDescriptor(echonetlite.EPCPowerLimit, "powerLimit", "watts", gaugeReading,
 			prefix+"power_limit_watts", "Power limit setting", deviceLabels),
-		hourMeter: newMetricDescriptor(echonetlite.EPCHourMeter, "hourMeter", "seconds", cumulativeReading,
+		hourMeter: newPropertyMetricDescriptor(echonetlite.EPCHourMeter, "hourMeter", "seconds", cumulativeReading,
 			prefix+"hour_meter_seconds_total", "Cumulative operating time", deviceLabels),
 	}
 }

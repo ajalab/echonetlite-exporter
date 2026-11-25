@@ -19,21 +19,21 @@ func NewMultipleInputPCSCollector(
 	interval time.Duration,
 	targets []echonetlite.Device,
 ) *MultipleInputPCSCollector {
-	power := newMetricDescriptor(
+	power := newPropertyMetricDescriptor(
 		echonetlite.EPCMultipleInputPCSInstantaneousElectricPower,
 		"instantaneousElectricPower", "watts", instantaneousReading,
 		"echonetlite_multiple_input_pcs_electric_power_watts",
 		"Measured instantaneous electric power",
 		deviceLabels,
 	)
-	normalEnergy := newMetricDescriptor(
+	normalEnergy := newPropertyMetricDescriptor(
 		echonetlite.EPCMultipleInputPCSNormalDirectionElectricEnergy,
 		"normalDirectionElectricEnergy", "joules", cumulativeReading,
 		"echonetlite_multiple_input_pcs_normal_direction_electric_energy_joules_total",
 		"Measured cumulative amount of electric energy (normal direction)",
 		deviceLabels,
 	)
-	reverseEnergy := newMetricDescriptor(
+	reverseEnergy := newPropertyMetricDescriptor(
 		echonetlite.EPCMultipleInputPCSReverseDirectionElectricEnergy,
 		"reverseDirectionElectricEnergy", "joules", cumulativeReading,
 		"echonetlite_multiple_input_pcs_reverse_direction_electric_energy_joules_total",
@@ -41,9 +41,9 @@ func NewMultipleInputPCSCollector(
 		deviceLabels,
 	)
 	const prefix = "echonetlite_multiple_input_pcs_"
-	powerSystemInterconnectionStatus := newMetricDescriptor(0xD0, "powerSystemInterconnectionStatus", "", gaugeReading,
-		prefix+"power_system_interconnection_status", "System interconnection status", deviceLabels)
-	superClass := newSuperClassMetrics(prefix)
+	powerSystemInterconnectionStatus := newPropertyMetricDescriptorWithValues(0xD0, "powerSystemInterconnectionStatus",
+		prefix+"power_system_interconnection_status", "System interconnection status", `{"0":"System-interconnected type (reverse power flow acceptable)","1":"Independent type","2":"System-interconnected type (reverse power flow not acceptable)"}`)
+	superClass := newSuperClassMetrics(prefix, `{"48":"On","49":"Off"}`)
 	descs := []metricDescriptor{
 		power, normalEnergy, reverseEnergy,
 		powerSystemInterconnectionStatus,

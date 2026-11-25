@@ -19,35 +19,35 @@ func NewDRElectricEnergyMeterCollector(
 	interval time.Duration,
 	targets []echonetlite.Device,
 ) *DRElectricEnergyMeterCollector {
-	acPower := newMetricDescriptor(
+	acPower := newPropertyMetricDescriptor(
 		echonetlite.EPCDRElectricEnergyMeterACInstantaneousElectricPower,
 		"acInstantaneousElectricPower", "watts", instantaneousReading,
 		"echonetlite_dr_electric_energy_meter_ac_electric_power_watts",
 		"Measured instantaneous electric power (AC input/output)",
 		deviceLabels,
 	)
-	independentPower := newMetricDescriptor(
+	independentPower := newPropertyMetricDescriptor(
 		echonetlite.EPCDRElectricEnergyMeterIndependentOperationInstantaneousElectricPower,
 		"independentOperationInstantaneousElectricPower", "watts", instantaneousReading,
 		"echonetlite_dr_electric_energy_meter_independent_operation_electric_power_watts",
 		"Measured instantaneous electric power (output during a power outage)",
 		deviceLabels,
 	)
-	inputEnergy := newMetricDescriptor(
+	inputEnergy := newPropertyMetricDescriptor(
 		echonetlite.EPCDRElectricEnergyMeterACInputCumulativeElectricEnergy,
 		"acInputCumulativeElectricEnergy", "joules", cumulativeReading,
 		"echonetlite_dr_electric_energy_meter_ac_input_electric_energy_joules_total",
 		"Measured cumulative amounts of electric energy (AC input)",
 		deviceLabels,
 	)
-	outputEnergy := newMetricDescriptor(
+	outputEnergy := newPropertyMetricDescriptor(
 		echonetlite.EPCDRElectricEnergyMeterACOutputCumulativeElectricEnergy,
 		"acOutputCumulativeElectricEnergy", "joules", cumulativeReading,
 		"echonetlite_dr_electric_energy_meter_ac_output_electric_energy_joules_total",
 		"Measured cumulative amounts of electric energy (AC output)",
 		deviceLabels,
 	)
-	independentEnergy := newMetricDescriptor(
+	independentEnergy := newPropertyMetricDescriptor(
 		echonetlite.EPCDRElectricEnergyMeterIndependentOperationCumulativeElectricEnergy,
 		"independentOperationCumulativeElectricEnergy", "joules", cumulativeReading,
 		"echonetlite_dr_electric_energy_meter_independent_operation_electric_energy_joules_total",
@@ -55,9 +55,9 @@ func NewDRElectricEnergyMeterCollector(
 		deviceLabels,
 	)
 	const prefix = "echonetlite_dr_electric_energy_meter_"
-	timeSynchronizationStatus := newMetricDescriptor(0xDB, "timeSynchronizationStatus", "", gaugeReading,
-		prefix+"time_synchronization_status", "Time synchronization status", deviceLabels)
-	superClass := newSuperClassMetrics(prefix)
+	timeSynchronizationStatus := newPropertyMetricDescriptorWithValues(0xDB, "timeSynchronizationStatus",
+		prefix+"time_synchronization_status", "Time synchronization status", `{"0":"no time synchronization","1":"time synchronization successful","2":"time synchronization failed","255":"time synchronization function not implemented"}`)
+	superClass := newSuperClassMetrics(prefix, superClassOperationStatusValues)
 	descs := []metricDescriptor{
 		acPower, independentPower, inputEnergy, outputEnergy, independentEnergy,
 		timeSynchronizationStatus,

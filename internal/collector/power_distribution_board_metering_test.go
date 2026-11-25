@@ -48,10 +48,10 @@ echonetlite_power_distribution_board_metering_measurement_channel32_joules_total
 # HELP echonetlite_power_distribution_board_metering_voltage_volts Measured instantaneous voltages. EPC=0xC8
 # TYPE echonetlite_power_distribution_board_metering_voltage_volts gauge
 echonetlite_power_distribution_board_metering_voltage_volts{eoj="028701",host="192.0.2.10",line_pair="s_t"} 100
-# HELP echonetlite_power_distribution_board_metering_fault_status Fault status. EPC=0x88
+# HELP echonetlite_power_distribution_board_metering_fault_status Fault status. values={"65":"Fault occurred.","66":"No fault has occurred."} EPC=0x88
 # TYPE echonetlite_power_distribution_board_metering_fault_status gauge
 echonetlite_power_distribution_board_metering_fault_status{eoj="028701",host="192.0.2.10"} 66
-# HELP echonetlite_power_distribution_board_metering_operation_status Operation status. EPC=0x80
+# HELP echonetlite_power_distribution_board_metering_operation_status Operation status. values={"48":"ON","49":"OFF"} EPC=0x80
 # TYPE echonetlite_power_distribution_board_metering_operation_status gauge
 echonetlite_power_distribution_board_metering_operation_status{eoj="028701",host="192.0.2.10"} 48
 `

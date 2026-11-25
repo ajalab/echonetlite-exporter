@@ -46,8 +46,22 @@ type metricDescriptor struct {
 	reading           metricReading
 }
 
-func newMetricDescriptor(epc uint8, propertyShortName, unit string, reading metricReading, name, propertyNameEN string, labels []string) metricDescriptor {
-	help := fmt.Sprintf("%s. EPC=0x%02X", propertyNameEN, epc)
+func newPropertyMetricDescriptor(epc uint8, propertyShortName, unit string, reading metricReading, name, propertyNameEN string, labels []string) metricDescriptor {
+	return buildMetricDescriptor(epc, propertyShortName, unit, reading, name, propertyNameEN, "", labels)
+}
+
+// stateValues is a JSON object mapping exported state codes to MRA descriptions.
+func newPropertyMetricDescriptorWithValues(epc uint8, propertyShortName, name, propertyNameEN, stateValues string) metricDescriptor {
+	return buildMetricDescriptor(epc, propertyShortName, "", gaugeReading, name, propertyNameEN, stateValues, deviceLabels)
+}
+
+func buildMetricDescriptor(epc uint8, propertyShortName, unit string, reading metricReading, name, propertyNameEN, stateValues string, labels []string) metricDescriptor {
+	help := propertyNameEN + "."
+	if stateValues != "" {
+		help += " values=" + stateValues
+	}
+	help += fmt.Sprintf(" EPC=0x%02X", epc)
+
 	return metricDescriptor{
 		desc:              prometheus.NewDesc(name, help, labels, nil),
 		propertyShortName: propertyShortName,

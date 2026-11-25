@@ -24,7 +24,7 @@ func TestHybridWaterHeaterGetWithBitmapPropertyMap(t *testing.T) {
 	if got.LinkageModeForSolarPowerGeneration != 0x42 || got.RemainingWater == nil || *got.RemainingWater != 150 {
 		t.Fatalf("expected linkage mode 0x42 and 150 L: %+v", got)
 	}
-	if got.WaterHeatingStatus == nil || !*got.WaterHeatingStatus || got.HeaterStatus == nil || *got.HeaterStatus {
+	if got.WaterHeatingStatus == nil || *got.WaterHeatingStatus != 0x41 || got.HeaterStatus == nil || *got.HeaterStatus != 0x42 {
 		t.Fatalf("expected valid optional heating states: %+v", got)
 	}
 	if got.HotWaterSupplyStatus != nil || got.TankCapacity != nil {

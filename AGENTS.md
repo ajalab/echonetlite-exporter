@@ -24,6 +24,7 @@
 - Export cumulative readings as counters.
 - End counter names with `_total` after any unit suffix, as in `echonetlite_watt_hour_meter_electric_energy_joules_total` for `wattHourMeter` / `cumulativeElectricEnergy`.
 - For device metrics, use the ECHONET Lite MRA `propertyName.en` followed by a period and ` EPC=0xNN` as the Prometheus `HELP` text. Use two uppercase hexadecimal digits for the EPC.
+- For enumerated device metrics, insert ` values={...}` before the EPC. Use a compact JSON object with exported sample values as decimal keys and MRA `descriptions.en` as values. For MRA ranges, use inclusive decimal range keys such as `"10...19"`.
 - By default, export one time series per device object instance and property.
 - Do not use MRA property values as metric label values.
 - Preserve the names, labels, units, and types of existing metrics.
